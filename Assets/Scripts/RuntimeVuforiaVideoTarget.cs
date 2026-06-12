@@ -122,7 +122,7 @@ public class RuntimeVuforiaVideoTarget : MonoBehaviour
             return;
 
         bool tracked = status.Status == Status.TRACKED || status.Status == Status.EXTENDED_TRACKED;
-        videoSurface.SetTracked(tracked);
+        videoSurface.HandleTrackingChanged(tracked);
     }
 
     private void OnDestroy()

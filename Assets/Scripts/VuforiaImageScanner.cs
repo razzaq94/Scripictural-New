@@ -752,7 +752,11 @@ public class VuforiaImageScanner : MonoBehaviour
         if (shouldBlockScanner == scannerBlockedByTracking)
             return;
 
+        bool wasBlocked = scannerBlockedByTracking;
         scannerBlockedByTracking = shouldBlockScanner;
+
+        if (wasBlocked && !scannerBlockedByTracking)
+            ResetScanDeduplication();
 
         if (scannerBlockedByTracking)
         {
@@ -763,6 +767,17 @@ public class VuforiaImageScanner : MonoBehaviour
         {
             debugText.text = string.Join("\n", logLines);
         }
+    }
+
+    private void ResetScanDeduplication()
+    {
+        hasLastFrameFingerprint = false;
+        lastFrameFingerprint = 0;
+        lastSendTime = -999f;
+        timer = scanInterval;
+
+        if (verboseLogs)
+            Log("<color=#888888>Scanner resumed - dedup reset</color>");
     }
 
     public void Log(string msg)

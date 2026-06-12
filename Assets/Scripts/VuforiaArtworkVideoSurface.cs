@@ -1,7 +1,7 @@
+using System;
 using System.IO;
 using System.Threading.Tasks;
 using UnityEngine;
-using UnityEngine.Networking;
 using UnityEngine.Video;
 
 public class VuforiaArtworkVideoSurface : MonoBehaviour
@@ -9,16 +9,17 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
     [SerializeField] private Material videoMaterial;
     [SerializeField] private string videoTextureProperty = "_MainTex";
     [SerializeField] private float surfaceYOffset = 0.002f;
-    [SerializeField] private bool playOnTargetFound = true;
     [SerializeField] private bool loop = true;
-    [SerializeField] private bool downloadVideoBeforePlay = true;
 
+    private GameObject surfaceRoot;
     private MeshRenderer videoMeshRenderer;
     private VideoPlayer videoPlayer;
 
-    public bool IsReady { get; private set; }
+    public bool IsVideoPrepared { get; private set; }
+    public bool IsTracked { get; private set; }
+    public event Action PreparedForPlayback;
 
-    public async Task SetupAsync(
+    public Task SetupAsync(
         Transform parent,
         Texture2D targetTexture,
         float targetWidthMeters,
@@ -36,48 +37,154 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         if (videoMaterial == null)
         {
             Debug.LogError("[VuforiaArtworkVideoSurface] Video material is not assigned.");
-            return;
+            return Task.CompletedTask;
         }
 
         CreateMeshSurface(targetTexture, targetWidthMeters);
-        await ConfigureVideoAsync(remoteVideoUrl, localVideoPath);
-        IsReady = videoPlayer != null;
+        HideQuad();
+        AssignVideoUrl(localVideoPath, remoteVideoUrl);
+        return Task.CompletedTask;
     }
 
-    public void SetTracked(bool tracked)
+    public void HandleTrackingChanged(bool tracked)
+    {
+        IsTracked = tracked;
+
+        if (!tracked)
+        {
+            HideQuad();
+            PauseVideo();
+            return;
+        }
+
+        if (string.IsNullOrEmpty(videoPlayer?.url))
+        {
+            Debug.LogWarning("[VuforiaArtworkVideoSurface] Track started but video URL is not set yet.");
+            return;
+        }
+
+        HideQuadVisual();
+        BeginPlaybackPrepare();
+    }
+
+    public void ShowQuadAndPlay()
+    {
+        if (surfaceRoot != null)
+            surfaceRoot.SetActive(true);
+
+        if (videoMeshRenderer != null)
+            videoMeshRenderer.enabled = true;
+
+        if (videoPlayer != null && videoPlayer.isPrepared)
+            videoPlayer.Play();
+    }
+
+    public void HideQuad()
+    {
+        PauseVideo();
+        HideQuadVisual();
+    }
+
+    private void HideQuadVisual()
     {
         if (videoMeshRenderer != null)
-            videoMeshRenderer.enabled = tracked;
+            videoMeshRenderer.enabled = false;
 
-        if (videoPlayer == null || !playOnTargetFound)
+        if (surfaceRoot != null)
+            surfaceRoot.SetActive(false);
+    }
+
+    public Task BindLocalVideoAsync(string localVideoPath)
+    {
+        if (string.IsNullOrWhiteSpace(localVideoPath) || !File.Exists(localVideoPath))
+            return Task.CompletedTask;
+
+        IsVideoPrepared = false;
+        AssignVideoUrl(localVideoPath, null);
+
+        if (IsTracked)
+            BeginPlaybackPrepare();
+
+        return Task.CompletedTask;
+    }
+
+    private void AssignVideoUrl(string localVideoPath, string remoteVideoUrl)
+    {
+        if (videoPlayer == null)
             return;
 
-        if (tracked)
+        string playUrl = null;
+
+        if (!string.IsNullOrWhiteSpace(localVideoPath) && File.Exists(localVideoPath))
+            playUrl = ToVideoPlayerUrl(localVideoPath);
+        else if (!string.IsNullOrWhiteSpace(remoteVideoUrl))
+            playUrl = remoteVideoUrl;
+
+        if (string.IsNullOrWhiteSpace(playUrl))
         {
-            if (videoPlayer.isPrepared)
-                videoPlayer.Play();
-            else
-                videoPlayer.Prepare();
+            Debug.LogWarning("[VuforiaArtworkVideoSurface] No video URL/path available yet.");
+            return;
         }
-        else
+
+        videoPlayer.url = playUrl;
+        Debug.Log("[VuforiaArtworkVideoSurface] Video URL set: " + playUrl);
+    }
+
+    private void BeginPlaybackPrepare()
+    {
+        if (videoPlayer == null || string.IsNullOrEmpty(videoPlayer.url))
+            return;
+
+        IsVideoPrepared = false;
+        HideQuadVisual();
+
+        if (!videoPlayer.gameObject.activeInHierarchy)
+            videoPlayer.gameObject.SetActive(true);
+
+        videoPlayer.enabled = true;
+        videoPlayer.prepareCompleted -= OnVideoPrepared;
+        videoPlayer.errorReceived -= OnVideoError;
+        videoPlayer.errorReceived += OnVideoError;
+        videoPlayer.Stop();
+        videoPlayer.Prepare();
+        videoPlayer.prepareCompleted += OnVideoPrepared;
+    }
+
+    private static string ToVideoPlayerUrl(string pathOrUrl)
+    {
+        if (string.IsNullOrWhiteSpace(pathOrUrl))
+            return null;
+
+        if (pathOrUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            pathOrUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ||
+            pathOrUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            return pathOrUrl;
+
+        try
         {
-            videoPlayer.Pause();
+            return new Uri(Path.GetFullPath(pathOrUrl)).AbsoluteUri;
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("[VuforiaArtworkVideoSurface] Invalid local video path: " + ex.Message);
+            return pathOrUrl;
         }
     }
 
     private void CreateMeshSurface(Texture2D targetTexture, float targetWidthMeters)
     {
-        GameObject surface = new GameObject("VideoSurface");
-        surface.transform.SetParent(transform, false);
-        surface.transform.localPosition = new Vector3(0f, surfaceYOffset, 0f);
-        surface.transform.localRotation = Quaternion.identity;
+        surfaceRoot = new GameObject("VideoSurface");
+        surfaceRoot.transform.SetParent(transform, false);
+        surfaceRoot.transform.localPosition = new Vector3(0f, surfaceYOffset, 0f);
+        surfaceRoot.transform.localRotation = Quaternion.identity;
+        surfaceRoot.SetActive(false);
 
         float aspect = (float)targetTexture.height / targetTexture.width;
         float width = targetWidthMeters;
         float height = targetWidthMeters * aspect;
 
-        MeshFilter meshFilter = surface.AddComponent<MeshFilter>();
-        videoMeshRenderer = surface.AddComponent<MeshRenderer>();
+        MeshFilter meshFilter = surfaceRoot.AddComponent<MeshFilter>();
+        videoMeshRenderer = surfaceRoot.AddComponent<MeshRenderer>();
         videoMeshRenderer.enabled = false;
         meshFilter.mesh = CreateTargetSizedMesh(width, height);
 
@@ -85,7 +192,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         videoMeshRenderer.material = materialInstance;
 
         GameObject videoObj = new GameObject("VideoPlayer");
-        videoObj.transform.SetParent(surface.transform, false);
+        videoObj.transform.SetParent(transform, false);
 
         videoPlayer = videoObj.AddComponent<VideoPlayer>();
         videoPlayer.source = VideoSource.Url;
@@ -97,71 +204,6 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         videoPlayer.waitForFirstFrame = true;
         videoPlayer.skipOnDrop = true;
         videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
-        videoPlayer.errorReceived += OnVideoError;
-    }
-
-    private async Task ConfigureVideoAsync(string remoteVideoUrl, string localVideoPath)
-    {
-        if (videoPlayer == null)
-            return;
-
-        string playUrl = null;
-
-        if (!string.IsNullOrWhiteSpace(localVideoPath) && File.Exists(localVideoPath))
-        {
-            playUrl = localVideoPath;
-        }
-        else if (downloadVideoBeforePlay && !string.IsNullOrWhiteSpace(remoteVideoUrl))
-        {
-            playUrl = await DownloadVideo(remoteVideoUrl);
-        }
-        else
-        {
-            playUrl = remoteVideoUrl;
-        }
-
-        if (string.IsNullOrWhiteSpace(playUrl))
-        {
-            Debug.LogError("[VuforiaArtworkVideoSurface] No valid video URL/path.");
-            return;
-        }
-
-        videoPlayer.prepareCompleted -= OnVideoPrepared;
-        videoPlayer.prepareCompleted += OnVideoPrepared;
-        videoPlayer.url = playUrl;
-        videoPlayer.Prepare();
-    }
-
-    public async Task BindLocalVideoAsync(string localVideoPath)
-    {
-        if (string.IsNullOrWhiteSpace(localVideoPath) || !File.Exists(localVideoPath))
-            return;
-
-        await ConfigureVideoAsync(null, localVideoPath);
-    }
-
-    private async Task<string> DownloadVideo(string url)
-    {
-        string fileName = "runtime_video_" + GetInstanceID() + ".mp4";
-        string filePath = Path.Combine(Application.persistentDataPath, fileName);
-
-        if (File.Exists(filePath))
-            File.Delete(filePath);
-
-        using UnityWebRequest request = UnityWebRequest.Get(url);
-        request.downloadHandler = new DownloadHandlerFile(filePath);
-
-        UnityWebRequestAsyncOperation operation = request.SendWebRequest();
-        while (!operation.isDone)
-            await Task.Yield();
-
-        if (request.result != UnityWebRequest.Result.Success)
-        {
-            Debug.LogError("[VuforiaArtworkVideoSurface] Video download error: " + request.error);
-            return null;
-        }
-
-        return filePath;
     }
 
     private static Mesh CreateTargetSizedMesh(float width, float height)
@@ -192,17 +234,25 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
     private void OnVideoPrepared(VideoPlayer vp)
     {
-        if (!playOnTargetFound)
-        {
-            if (videoMeshRenderer != null)
-                videoMeshRenderer.enabled = true;
-            vp.Play();
-        }
+        vp.prepareCompleted -= OnVideoPrepared;
+        IsVideoPrepared = true;
+        Debug.Log("[VuforiaArtworkVideoSurface] Video prepared.");
+        PreparedForPlayback?.Invoke();
+
+        if (IsTracked)
+            ShowQuadAndPlay();
+    }
+
+    private void PauseVideo()
+    {
+        if (videoPlayer != null && videoPlayer.isPlaying)
+            videoPlayer.Pause();
     }
 
     private void OnVideoError(VideoPlayer vp, string message)
     {
         Debug.LogError("[VuforiaArtworkVideoSurface] Video error: " + message);
+        IsVideoPrepared = false;
     }
 
     private void OnDestroy()

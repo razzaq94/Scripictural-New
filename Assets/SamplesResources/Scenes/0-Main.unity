@@ -332,6 +332,8 @@ MonoBehaviour:
   physicalWidthMeters: 0.2
   cacheMarkerImages: 1
   videoMaterial: {fileID: 2100000, guid: 79a196e851a90b7408b42c8ee2c39cae, type: 2}
+  loadingCanvasPrefab: {fileID: 7341639919903733916, guid: 55a5cb0425af0a54ba8594d0650f3769,
+    type: 3}
   assetBaseUrl: https://api.scripictural.tecshield.net/
   scanUnlockDelay: 0.75
   trackingHeartbeatTimeout: 1
@@ -381,13 +383,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::VuforiaImageScanner
   debugText: {fileID: 0}
   vuforiaDynamicTracker: {fileID: 287742718}
-  scanInterval: 1
+  scanInterval: 0.5
   useOriginalCameraResolution: 0
   processingWidth: 480
   processingHeight: 640
   sendCooldown: 0.1
   qualitySampleStride: 1
-  serverFrameZoom: 1
+  serverFrameZoom: 1.8
   edgeThreshold: 0.002
   colorVarThreshold: 0.005
   frameSimilarityThreshold: 0.7
@@ -432,7 +434,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 22400762, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0.000118255615
+      value: 0.00011062622
       objectReference: {fileID: 0}
     - target: {fileID: 22426080, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchorMax.x
