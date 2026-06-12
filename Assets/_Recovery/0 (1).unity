@@ -387,7 +387,7 @@ MonoBehaviour:
   processingHeight: 640
   sendCooldown: 0.1
   qualitySampleStride: 1
-  serverFrameZoom: 1
+  serverFrameZoom: 1.8
   edgeThreshold: 0.002
   colorVarThreshold: 0.005
   frameSimilarityThreshold: 0.7
@@ -432,7 +432,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 22400762, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: 0.000118255615
+      value: 0.00012207031
       objectReference: {fileID: 0}
     - target: {fileID: 22426080, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchorMax.x

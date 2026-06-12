@@ -10,7 +10,12 @@ using UnityEngine.Android;
 
 public class VuforiaImageScanner : MonoBehaviour
 {
-    private const PixelFormat CameraPixelFormat = PixelFormat.RGB888;
+    private static readonly PixelFormat[] PreferredCameraFormats =
+    {
+        PixelFormat.RGB888,
+        PixelFormat.RGBA8888
+    };
+
     private const TextureFormat ProcessingTextureFormat = TextureFormat.RGB24;
 
     [Header("References")]
@@ -32,18 +37,28 @@ public class VuforiaImageScanner : MonoBehaviour
     [SerializeField, Range(0.7f, 0.99f)] private float frameSimilarityThreshold = 0.9f;
     [SerializeField, Range(4, 16)] private int fingerprintGridSize = 8;
 
+    [Header("Orientation")]
+    [SerializeField] private bool normalizePortraitOrientation = true;
+
     [Header("Debug")]
     [SerializeField] private bool verboseLogs = false;
+    [SerializeField] private bool saveDebugFrames = false;
 
     private float timer;
     private bool isProcessing;
     private bool formatRegistered;
     private bool vuforiaReady;
+    private bool hasCachedCameraFrame;
+    private bool hasVideoBackgroundFrame;
+    private PixelFormat activeCameraFormat = PixelFormat.UNKNOWN_FORMAT;
+    private string lastCaptureSource = "none";
+    private int framesSinceFormatRegistration;
     private float lastSendTime = -999f;
     private readonly List<string> logLines = new List<string>();
     private const int MaxLogLines = 14;
     private Texture2D processingTexture;
     private Texture2D cameraTexture;
+    private Texture2D videoBackgroundTexture;
     private bool scannerBlockedByTracking;
     private ulong lastFrameFingerprint;
     private bool hasLastFrameFingerprint;
@@ -55,11 +70,17 @@ public class VuforiaImageScanner : MonoBehaviour
     {
         VuforiaApplication.Instance.OnVuforiaStarted += OnVuforiaStarted;
         VuforiaApplication.Instance.OnVuforiaStopped += OnVuforiaStopped;
+
+        if (VuforiaApplication.Instance.IsRunning)
+            OnVuforiaStarted();
+
         Log($"Scanner started | interval={scanInterval:F2}s | cooldown={sendCooldown:F2}s");
     }
 
     private void OnDestroy()
     {
+        DetachVuforiaHooks();
+
         VuforiaApplication.Instance.OnVuforiaStarted -= OnVuforiaStarted;
         VuforiaApplication.Instance.OnVuforiaStopped -= OnVuforiaStopped;
 
@@ -71,44 +92,174 @@ public class VuforiaImageScanner : MonoBehaviour
 
         if (cameraTexture != null)
             Destroy(cameraTexture);
+
+        if (videoBackgroundTexture != null)
+            Destroy(videoBackgroundTexture);
     }
 
     private void OnVuforiaStarted()
     {
-        cameraTexture = new Texture2D(0, 0, ProcessingTextureFormat, false);
+        cameraTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
+        videoBackgroundTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
         RegisterCameraFormat();
+        AttachVuforiaHooks();
         vuforiaReady = true;
+        framesSinceFormatRegistration = 0;
+
+        Log($"Vuforia ready | formatRegistered={formatRegistered} | format={activeCameraFormat}");
     }
 
     private void OnVuforiaStopped()
     {
+        DetachVuforiaHooks();
         UnregisterCameraFormat();
         vuforiaReady = false;
+        hasCachedCameraFrame = false;
+        hasVideoBackgroundFrame = false;
+        framesSinceFormatRegistration = 0;
 
         if (cameraTexture != null)
         {
             Destroy(cameraTexture);
             cameraTexture = null;
         }
+
+        if (videoBackgroundTexture != null)
+        {
+            Destroy(videoBackgroundTexture);
+            videoBackgroundTexture = null;
+        }
+    }
+
+    private void AttachVuforiaHooks()
+    {
+        if (VuforiaBehaviour.Instance == null)
+            return;
+
+        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnVuforiaUpdated;
+        VuforiaBehaviour.Instance.World.OnStateUpdated += OnVuforiaUpdated;
+
+        if (VuforiaBehaviour.Instance.VideoBackground != null)
+        {
+            VuforiaBehaviour.Instance.VideoBackground.OnVideoBackgroundChanged -= OnVideoBackgroundChanged;
+            VuforiaBehaviour.Instance.VideoBackground.OnVideoBackgroundChanged += OnVideoBackgroundChanged;
+        }
+    }
+
+    private void DetachVuforiaHooks()
+    {
+        if (VuforiaBehaviour.Instance == null)
+            return;
+
+        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnVuforiaUpdated;
+
+        if (VuforiaBehaviour.Instance.VideoBackground != null)
+            VuforiaBehaviour.Instance.VideoBackground.OnVideoBackgroundChanged -= OnVideoBackgroundChanged;
+    }
+
+    private void OnVideoBackgroundChanged()
+    {
+        hasVideoBackgroundFrame = true;
+        CacheVideoBackgroundFrame();
+    }
+
+    private void OnVuforiaUpdated()
+    {
+        if (!vuforiaReady || VuforiaBehaviour.Instance == null)
+            return;
+
+        framesSinceFormatRegistration++;
+
+        if (formatRegistered && cameraTexture != null)
+            CacheCameraDeviceFrame();
+
+        CacheVideoBackgroundFrame();
+    }
+
+    private void CacheCameraDeviceFrame()
+    {
+        try
+        {
+            Image cameraImage = VuforiaBehaviour.Instance.CameraDevice.GetCameraImage(activeCameraFormat);
+            if (Image.IsNullOrEmpty(cameraImage))
+                return;
+
+            cameraImage.CopyToTexture(cameraTexture, true);
+            hasCachedCameraFrame = true;
+        }
+        catch (System.Exception ex)
+        {
+            if (verboseLogs)
+                Debug.LogWarning("[VuforiaScanner] CameraDevice capture failed: " + ex.Message);
+        }
+    }
+
+    private void CacheVideoBackgroundFrame()
+    {
+        Texture source = VuforiaBehaviour.Instance?.VideoBackground?.VideoBackgroundTexture;
+        if (source == null || source.width <= 16 || source.height <= 16 || videoBackgroundTexture == null)
+            return;
+
+        try
+        {
+            RenderTexture rt = RenderTexture.GetTemporary(source.width, source.height, 0, RenderTextureFormat.ARGB32);
+            Graphics.Blit(source, rt);
+
+            RenderTexture prev = RenderTexture.active;
+            RenderTexture.active = rt;
+
+            if (videoBackgroundTexture.width != source.width || videoBackgroundTexture.height != source.height)
+            {
+                videoBackgroundTexture.Reinitialize(source.width, source.height);
+                videoBackgroundTexture.Apply(false, false);
+            }
+
+            videoBackgroundTexture.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+            videoBackgroundTexture.Apply(false, false);
+
+            RenderTexture.active = prev;
+            RenderTexture.ReleaseTemporary(rt);
+            hasVideoBackgroundFrame = true;
+        }
+        catch (System.Exception ex)
+        {
+            if (verboseLogs)
+                Debug.LogWarning("[VuforiaScanner] VideoBackground capture failed: " + ex.Message);
+        }
     }
 
     private void RegisterCameraFormat()
     {
         if (VuforiaBehaviour.Instance == null)
+        {
+            formatRegistered = false;
+            activeCameraFormat = PixelFormat.UNKNOWN_FORMAT;
             return;
+        }
 
-        formatRegistered = VuforiaBehaviour.Instance.CameraDevice.SetFrameFormat(CameraPixelFormat, true);
-        if (!formatRegistered)
-            Debug.LogWarning("[VuforiaScanner] Failed to register RGB888 camera format.");
+        foreach (PixelFormat format in PreferredCameraFormats)
+        {
+            if (VuforiaBehaviour.Instance.CameraDevice.SetFrameFormat(format, true))
+            {
+                activeCameraFormat = format;
+                formatRegistered = true;
+                return;
+            }
+        }
+
+        formatRegistered = false;
+        activeCameraFormat = PixelFormat.UNKNOWN_FORMAT;
+        Log("<color=#ffaa00>Camera pixel format registration failed. Will use VideoBackground texture.</color>");
     }
 
     private void UnregisterCameraFormat()
     {
-        if (VuforiaBehaviour.Instance == null || !formatRegistered)
+        if (VuforiaBehaviour.Instance == null || !formatRegistered || activeCameraFormat == PixelFormat.UNKNOWN_FORMAT)
             return;
 
-        VuforiaBehaviour.Instance.CameraDevice.SetFrameFormat(CameraPixelFormat, false);
+        VuforiaBehaviour.Instance.CameraDevice.SetFrameFormat(activeCameraFormat, false);
         formatRegistered = false;
+        activeCameraFormat = PixelFormat.UNKNOWN_FORMAT;
     }
 
     private void Update()
@@ -116,6 +267,13 @@ public class VuforiaImageScanner : MonoBehaviour
         if (!HasCameraPermission())
         {
             RefreshCameraPermissionState();
+            return;
+        }
+
+        if (!vuforiaReady)
+        {
+            if (verboseLogs && Time.frameCount % 120 == 0)
+                Log("<color=#ffaa00>Waiting for Vuforia to start...</color>");
             return;
         }
 
@@ -159,9 +317,12 @@ public class VuforiaImageScanner : MonoBehaviour
         Texture2D frame = CaptureFrame();
         if (frame == null)
         {
+            Log("<color=#ff4444>Frame capture failed - no frame sent</color>");
             isProcessing = false;
             yield break;
         }
+
+        Log($"<color=#888888>Captured {frame.width}x{frame.height} via {lastCaptureSource}</color>");
 
         float edgeVal = GetEdgeDensity(frame);
         float colorVal = GetColorVariance(frame);
@@ -184,6 +345,9 @@ public class VuforiaImageScanner : MonoBehaviour
                 yield break;
             }
 
+            if (saveDebugFrames)
+                SaveDebugFrame(frame);
+
             yield return StartCoroutine(
                 ServerManager.Instance.SendFrameDetailed(
                     frame,
@@ -202,7 +366,8 @@ public class VuforiaImageScanner : MonoBehaviour
                         }
                         else
                         {
-                            Log("<color=#ff4444>No match </color>");
+                            string debugInfo = FormatNoMatchDebug(response);
+                            Log("<color=#ff4444>No match</color>" + debugInfo);
                         }
                     },
                     error => Log($"<color=#ff4444>Request failed - {error}</color>")
@@ -237,36 +402,66 @@ public class VuforiaImageScanner : MonoBehaviour
         if (!HasCameraPermission())
             return null;
 
-        if (vuforiaReady && formatRegistered && VuforiaBehaviour.Instance != null)
+        if (!vuforiaReady)
         {
-            try
+            if (verboseLogs)
+                Log("<color=#ffaa00>Vuforia not ready yet</color>");
+            return null;
+        }
+
+        if (formatRegistered && hasCachedCameraFrame && cameraTexture != null && cameraTexture.width > 0)
+        {
+            lastCaptureSource = "vuforia-camera";
+            return BuildProcessingFrame(cameraTexture, rotateForRawCamera: true);
+        }
+
+        if (formatRegistered && VuforiaBehaviour.Instance != null && cameraTexture != null)
+        {
+            CacheCameraDeviceFrame();
+            if (hasCachedCameraFrame && cameraTexture.width > 0)
             {
-                Image cameraImage = VuforiaBehaviour.Instance.CameraDevice.GetCameraImage(CameraPixelFormat);
-                if (!Image.IsNullOrEmpty(cameraImage))
-                {
-                    cameraImage.CopyToTexture(cameraTexture, true);
-                    return BuildProcessingFrame(cameraTexture);
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Debug.LogWarning("[VuforiaScanner] Camera frame capture failed: " + ex.Message);
+                lastCaptureSource = "vuforia-poll";
+                return BuildProcessingFrame(cameraTexture, rotateForRawCamera: true);
             }
         }
 
+        CacheVideoBackgroundFrame();
+        if (hasVideoBackgroundFrame && videoBackgroundTexture != null && videoBackgroundTexture.width > 0)
+        {
+            lastCaptureSource = "vuforia-video-background";
+            return BuildProcessingFrame(videoBackgroundTexture, rotateForRawCamera: false);
+        }
+
+        lastCaptureSource = "screen-fallback";
+        Log("<color=#ffaa00>WARNING: Vuforia camera unavailable. Using screen fallback.</color>");
         if (verboseLogs)
-            Log("<color=#ffaa00>Using screen capture fallback</color>");
+        {
+            Log($"<color=#ffaa00>ready={vuforiaReady} format={formatRegistered}/{activeCameraFormat} " +
+                $"cachedCamera={hasCachedCameraFrame} cachedVB={hasVideoBackgroundFrame} " +
+                $"warmupFrames={framesSinceFormatRegistration}</color>");
+        }
 
         return CaptureScreenFallback();
     }
 
-    private Texture2D BuildProcessingFrame(Texture2D source)
+    private Texture2D BuildProcessingFrame(Texture2D source, bool rotateForRawCamera)
     {
-        RectInt cropRect = ResolveInputRect(source.width, source.height);
+        Texture2D oriented = source;
+        Texture2D rotatedTemp = null;
+
+        if (rotateForRawCamera &&
+            normalizePortraitOrientation &&
+            ShouldRotateToPortrait(source.width, source.height))
+        {
+            rotatedTemp = RotateTexture90Clockwise(source);
+            oriented = rotatedTemp;
+        }
+
+        RectInt cropRect = ResolveInputRect(oriented.width, oriented.height);
         Vector2Int outputSize = ResolveOutputDimensions(cropRect.width, cropRect.height);
         EnsureProcessingTexture(outputSize.x, outputSize.y);
 
-        Color[] pixels = source.GetPixels(
+        Color[] pixels = oriented.GetPixels(
             cropRect.x,
             cropRect.y,
             cropRect.width,
@@ -295,7 +490,65 @@ public class VuforiaImageScanner : MonoBehaviour
             processingTexture.Apply(false, false);
         }
 
+        if (rotatedTemp != null)
+            Destroy(rotatedTemp);
+
         return processingTexture;
+    }
+
+    private static bool ShouldRotateToPortrait(int width, int height)
+    {
+        bool inputLandscape = width >= height;
+        bool screenPortrait = Screen.height >= Screen.width;
+        return inputLandscape && screenPortrait;
+    }
+
+    private static Texture2D RotateTexture90Clockwise(Texture2D source)
+    {
+        int width = source.width;
+        int height = source.height;
+        Color32[] src = source.GetPixels32();
+        int newWidth = height;
+        int newHeight = width;
+        Color32[] dst = new Color32[src.Length];
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int srcIndex = y * width + x;
+                int newX = height - 1 - y;
+                int newY = x;
+                dst[newY * newWidth + newX] = src[srcIndex];
+            }
+        }
+
+        Texture2D rotated = new Texture2D(newWidth, newHeight, source.format, false);
+        rotated.SetPixels32(dst);
+        rotated.Apply(false, false);
+        return rotated;
+    }
+
+    private static string FormatNoMatchDebug(ServerManager.MatchResponse response)
+    {
+        if (response == null)
+            return " (null response)";
+
+        string debug = $" | confidence={response.confidence:F3}";
+        if (response.debug != null)
+            debug += $" | regions={response.debug.regionsDetected} | candidates={response.debug.candidatesChecked}";
+
+        return debug;
+    }
+
+    private static void SaveDebugFrame(Texture2D frame)
+    {
+        byte[] jpg = frame.EncodeToJPG(90);
+        string path = System.IO.Path.Combine(
+            Application.persistentDataPath,
+            $"vuforia_scan_{System.DateTime.Now:yyyyMMdd_HHmmss_fff}.jpg");
+        System.IO.File.WriteAllBytes(path, jpg);
+        Debug.Log("[VuforiaScanner] Debug frame saved: " + path);
     }
 
     private Texture2D CaptureScreenFallback()
