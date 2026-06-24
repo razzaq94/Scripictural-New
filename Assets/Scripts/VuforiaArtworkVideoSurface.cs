@@ -67,8 +67,23 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         BeginPlaybackPrepare();
     }
 
+    public void ForceHide()
+    {
+        IsTracked = false;
+        HideQuad();
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            ForceHide();
+    }
+
     public void ShowQuadAndPlay()
     {
+        if (!IsTracked)
+            return;
+
         if (surfaceRoot != null)
             surfaceRoot.SetActive(true);
 
@@ -245,8 +260,12 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
     private void PauseVideo()
     {
-        if (videoPlayer != null && videoPlayer.isPlaying)
-            videoPlayer.Pause();
+        if (videoPlayer != null)
+        {
+            if (videoPlayer.isPlaying)
+                videoPlayer.Pause();
+            videoPlayer.Stop();
+        }
     }
 
     private void OnVideoError(VideoPlayer vp, string message)

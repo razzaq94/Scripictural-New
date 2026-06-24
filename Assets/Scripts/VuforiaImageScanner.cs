@@ -44,6 +44,8 @@ public class VuforiaImageScanner : MonoBehaviour
     [SerializeField] private bool verboseLogs = false;
     [SerializeField] private bool saveDebugFrames = false;
 
+    [SerializeField] GameObject splashCanvas;
+
     private float timer;
     private bool isProcessing;
     private bool formatRegistered;
@@ -99,16 +101,23 @@ public class VuforiaImageScanner : MonoBehaviour
 
     private void OnVuforiaStarted()
     {
+
         cameraTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
         videoBackgroundTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
         RegisterCameraFormat();
         AttachVuforiaHooks();
         vuforiaReady = true;
         framesSinceFormatRegistration = 0;
-
         Log($"Vuforia ready | formatRegistered={formatRegistered} | format={activeCameraFormat}");
-    }
 
+        StartCoroutine(HideSplash());
+    }
+    private IEnumerator HideSplash()
+    {
+        yield return new WaitForSeconds(1.5f);
+        splashCanvas.SetActive(false);
+
+    }
     private void OnVuforiaStopped()
     {
         DetachVuforiaHooks();

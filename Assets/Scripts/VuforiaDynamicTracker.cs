@@ -24,7 +24,6 @@ public class VuforiaDynamicTracker : MonoBehaviour
         public VuforiaArtworkVideoSurface videoSurface;
         public bool isVideoReady;
         public bool isActivelyTracked;
-        public bool isPresentationTracked;
     }
 
     [Header("Target")]
@@ -140,12 +139,12 @@ public class VuforiaDynamicTracker : MonoBehaviour
             yield break;
         }
 
-        if (texture.width > 2048 || texture.height > 2048)
-        {
-            Debug.LogError(LogTag + $" Marker too large: {texture.width}x{texture.height}");
-            FinishProcessing(artworkId);
-            yield break;
-        }
+        //if (texture.width > 2048 || texture.height > 2048)
+        //{
+        //    Debug.LogError(LogTag + $" Marker too large: {texture.width}x{texture.height}");
+        //    FinishProcessing(artworkId);
+        //    yield break;
+        //}
 
         Task<ImageTargetBehaviour> createTask = VuforiaBehaviour.Instance.ObserverFactory.CreateImageTargetAsync(
             texture,
@@ -248,18 +247,15 @@ public class VuforiaDynamicTracker : MonoBehaviour
         if (!runtimeArtworkMap.TryGetValue(artworkId, out RuntimeArtworkData data))
             return;
 
+        // Only show video while the physical image is visible — not EXTENDED_TRACKED.
         bool activelyTracked = status.Status == Status.TRACKED;
-        bool presentationTracked =
-            status.Status == Status.TRACKED || status.Status == Status.EXTENDED_TRACKED;
-
-        bool wasPresentationTracked = data.isPresentationTracked;
+        bool wasActivelyTracked = data.isActivelyTracked;
         data.isActivelyTracked = activelyTracked;
-        data.isPresentationTracked = presentationTracked;
         runtimeArtworkMap[artworkId] = data;
 
-        if (presentationTracked)
+        if (activelyTracked)
         {
-            if (!wasPresentationTracked)
+            if (!wasActivelyTracked)
                 MOST_HapticFeedback.Generate(MOST_HapticFeedback.HapticTypes.LightImpact);
 
             MarkArtworkTracking(artworkId);
@@ -275,8 +271,12 @@ public class VuforiaDynamicTracker : MonoBehaviour
     private void OnArtworkTracked(RuntimeArtworkData data)
     {
         EnsureLoadingCanvas(data);
-        data.videoSurface?.HideQuad();
         SetMarkerPreviewVisible(data.imageTarget, false);
+
+        if (data.videoSurface != null)
+            data.videoSurface.gameObject.SetActive(true);
+
+        data.videoSurface?.HideQuad();
 
         bool waitingForVideo = artworksInLoadingState.Contains(data.artworkId) || !data.isVideoReady;
         if (waitingForVideo)
@@ -292,10 +292,13 @@ public class VuforiaDynamicTracker : MonoBehaviour
     private void OnArtworkLost(RuntimeArtworkData data)
     {
         data.isActivelyTracked = false;
-        data.isPresentationTracked = false;
         runtimeArtworkMap[data.artworkId] = data;
 
         data.videoSurface?.HandleTrackingChanged(false);
+
+        if (data.videoSurface != null)
+            data.videoSurface.gameObject.SetActive(false);
+
         SetLoadingCanvasActive(data.artworkId, false);
         SetMarkerPreviewVisible(data.imageTarget, false);
     }
@@ -308,7 +311,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
         data.isVideoReady = true;
         runtimeArtworkMap[artworkId] = data;
 
-        if (!data.isPresentationTracked)
+        if (!data.isActivelyTracked)
             return;
 
         SetArtworkLoadingState(artworkId, false);
@@ -354,6 +357,28 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         float worldScale = 1.011f / ppu;
         rect.localScale = new Vector3(worldScale, worldScale, worldScale);
+        LayoutSquareLoadingIndicator(loadingGo.transform, targetWidth * ppu * 0.15f);
+    }
+
+    private static void LayoutSquareLoadingIndicator(Transform root, float squareSize)
+    {
+        if (root == null)
+            return;
+
+        Transform loading13 = root.Find("Loading13");
+        if (loading13 == null)
+            return;
+
+        RectTransform loadingRect = loading13 as RectTransform;
+        if (loadingRect == null)
+            return;
+
+        loadingRect.anchorMin = new Vector2(0.5f, 0.5f);
+        loadingRect.anchorMax = new Vector2(0.5f, 0.5f);
+        loadingRect.pivot = new Vector2(0.5f, 0.5f);
+        loadingRect.anchoredPosition = Vector2.zero;
+        loadingRect.sizeDelta = new Vector2(squareSize, squareSize);
+        loadingRect.localScale = Vector3.one;
     }
 
     private void SetLoadingCanvasActive(string artworkId, bool active)
@@ -463,7 +488,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
         if (!runtimeArtworkMap.TryGetValue(artworkId, out RuntimeArtworkData data))
             return;
 
-        if (!data.isPresentationTracked)
+        if (!data.isActivelyTracked)
             return;
 
         if (isLoading)
@@ -526,6 +551,24 @@ public class VuforiaDynamicTracker : MonoBehaviour
         }
 
         unlockRoutine = null;
+    }
+
+    private void OnApplicationPause(bool pauseStatus)
+    {
+        if (pauseStatus)
+            HideAllArtworkPresentation();
+    }
+
+    private void OnApplicationFocus(bool hasFocus)
+    {
+        if (!hasFocus)
+            HideAllArtworkPresentation();
+    }
+
+    private void HideAllArtworkPresentation()
+    {
+        foreach (RuntimeArtworkData data in runtimeArtworkMap.Values)
+            OnArtworkLost(data);
     }
 
     private void OnDestroy()
