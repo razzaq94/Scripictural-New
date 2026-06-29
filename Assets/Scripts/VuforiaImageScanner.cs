@@ -286,7 +286,7 @@ public class VuforiaImageScanner : MonoBehaviour
             return;
         }
 
-        bool shouldBlockScanner = vuforiaDynamicTracker != null && vuforiaDynamicTracker.ShouldBlockScanner();
+        bool shouldBlockScanner = IsScannerBlocked();
         HandleTrackingBlockState(shouldBlockScanner);
         if (shouldBlockScanner)
             return;
@@ -309,7 +309,7 @@ public class VuforiaImageScanner : MonoBehaviour
             yield break;
         }
 
-        if (vuforiaDynamicTracker != null && vuforiaDynamicTracker.ShouldBlockScanner())
+        if (IsScannerBlocked())
         {
             isProcessing = false;
             yield break;
@@ -756,6 +756,14 @@ public class VuforiaImageScanner : MonoBehaviour
         return count;
     }
 
+    private bool IsScannerBlocked()
+    {
+        if (ChatManager.instance != null && ChatManager.instance.IsChatOpen)
+            return true;
+
+        return vuforiaDynamicTracker != null && vuforiaDynamicTracker.ShouldBlockScanner();
+    }
+
     private void HandleTrackingBlockState(bool shouldBlockScanner)
     {
         if (shouldBlockScanner == scannerBlockedByTracking)
@@ -791,7 +799,7 @@ public class VuforiaImageScanner : MonoBehaviour
 
     public void Log(string msg)
     {
-        Debug.Log("[VuforiaScanner] " + msg);
+        //Debug.Log("[VuforiaScanner] " + msg);
 
         string stripped = msg;
         const string colorOpen = "<color=";

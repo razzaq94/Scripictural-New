@@ -73,6 +73,10 @@ public class VuforiaDynamicTracker : MonoBehaviour
                     : detectData.artwork.originalVideoUrl;
         }
 
+
+        ChatManager.instance.SetCurrentArtworkId(detectData.artworkId);
+        ChatManager.instance.SetCurrentDescription(detectData.artwork.metaData.description);
+
         OnArtworkDetected(detectData.artworkId, imageUrl, videoUrl);
     }
 
