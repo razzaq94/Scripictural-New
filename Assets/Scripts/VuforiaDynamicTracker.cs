@@ -62,17 +62,9 @@ public class VuforiaDynamicTracker : MonoBehaviour
         }
 
         string imageUrl = detectData.artwork != null ? detectData.artwork.imageURL : string.Empty;
-        string videoUrl = string.Empty;
-
-        if (detectData.artwork != null)
-        {
-            videoUrl = !string.IsNullOrWhiteSpace(detectData.artwork.compressedVideoUrl)
-                ? detectData.artwork.compressedVideoUrl
-                : !string.IsNullOrWhiteSpace(detectData.artwork.videoURL)
-                    ? detectData.artwork.videoURL
-                    : detectData.artwork.originalVideoUrl;
-        }
-
+        string videoUrl = detectData.artwork != null && !string.IsNullOrWhiteSpace(detectData.artwork.compressedVideoUrl)
+            ? detectData.artwork.compressedVideoUrl
+            : string.Empty;
 
         ChatManager.instance.SetCurrentArtworkId(detectData.artworkId);
         ChatManager.instance.SetCurrentDescription(detectData.artwork.metaData.description);
@@ -170,7 +162,6 @@ public class VuforiaDynamicTracker : MonoBehaviour
         imageTarget.name = artworkId;
         imageTarget.transform.SetParent(transform, false);
         SetMarkerPreviewVisible(imageTarget, false);
-        imageTarget.OnTargetStatusChanged += OnTargetStatusChanged;
 
         string localVideoPath = ArtworkSessionCache.GetVideoPath(artworkId);
         bool hasLocalVideo = ArtworkSessionCache.HasVideo(artworkId);
@@ -191,10 +182,11 @@ public class VuforiaDynamicTracker : MonoBehaviour
             aspect = (float)texture.width / texture.height,
             imageTarget = imageTarget,
             videoSurface = videoSurface,
-            isVideoReady = hasLocalVideo
+            isVideoReady = hasLocalVideo || !string.IsNullOrWhiteSpace(videoUrl)
         };
 
         runtimeArtworkMap[artworkId] = data;
+        imageTarget.OnTargetStatusChanged += OnTargetStatusChanged;
         EnsureLoadingCanvas(data);
 
         Task setupVideoTask = videoSurface.SetupAsync(
@@ -214,8 +206,10 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         if (!hasLocalVideo && !string.IsNullOrWhiteSpace(videoUrl))
             StartCoroutine(DownloadVideoAndBind(data));
-        else
-            SetArtworkLoadingState(artworkId, false);
+
+        SetArtworkLoadingState(artworkId, false);
+        SyncInitialTrackingState(artworkId);
+        StartCoroutine(EnsureInitialTrackingState(artworkId));
 
         processingArtworkIds.Remove(artworkId);
         Debug.Log(LogTag + " Runtime target ready | artworkId=" + artworkId);
@@ -227,22 +221,20 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         if (!File.Exists(data.localVideoPath))
         {
-            Debug.LogWarning(LogTag + " Video download failed | artworkId=" + data.artworkId);
-            SetArtworkLoadingState(data.artworkId, false);
+            Debug.LogWarning(LogTag + " Video cache download failed | artworkId=" + data.artworkId);
             yield break;
         }
 
-        data.isVideoReady = true;
-        runtimeArtworkMap[data.artworkId] = data;
+        if (!runtimeArtworkMap.TryGetValue(data.artworkId, out RuntimeArtworkData current))
+            yield break;
 
-        if (data.videoSurface != null)
-        {
-            Task bindTask = data.videoSurface.BindLocalVideoAsync(data.localVideoPath);
-            while (!bindTask.IsCompleted)
-                yield return null;
-        }
+        // Keep streaming from the remote URL if playback already started.
+        if (current.videoSurface != null && current.videoSurface.IsVideoPrepared)
+            yield break;
 
-        SetArtworkLoadingState(data.artworkId, false);
+        Task bindTask = current.videoSurface.BindLocalVideoAsync(data.localVideoPath);
+        while (!bindTask.IsCompleted)
+            yield return null;
     }
 
     private void OnTargetStatusChanged(ObserverBehaviour behaviour, TargetStatus status)
@@ -251,25 +243,63 @@ public class VuforiaDynamicTracker : MonoBehaviour
         if (!runtimeArtworkMap.TryGetValue(artworkId, out RuntimeArtworkData data))
             return;
 
-        // Only show video while the physical image is visible — not EXTENDED_TRACKED.
-        bool activelyTracked = status.Status == Status.TRACKED;
+        ApplyTrackingState(data, status.Status == Status.TRACKED, triggerHapticOnGain: true);
+    }
+
+    private void SyncInitialTrackingState(string artworkId)
+    {
+        if (!runtimeArtworkMap.TryGetValue(artworkId, out RuntimeArtworkData data))
+            return;
+
+        if (data.imageTarget == null || data.isActivelyTracked)
+            return;
+
+        if (data.imageTarget.TargetStatus.Status == Status.TRACKED)
+            ApplyTrackingState(data, activelyTracked: true, triggerHapticOnGain: true);
+    }
+
+    private IEnumerator EnsureInitialTrackingState(string artworkId)
+    {
+        for (int i = 0; i < 8; i++)
+        {
+            yield return null;
+
+            if (!runtimeArtworkMap.TryGetValue(artworkId, out RuntimeArtworkData data))
+                yield break;
+
+            if (data.isActivelyTracked)
+                yield break;
+
+            if (data.imageTarget != null && data.imageTarget.TargetStatus.Status == Status.TRACKED)
+            {
+                ApplyTrackingState(data, activelyTracked: true, triggerHapticOnGain: true);
+                yield break;
+            }
+        }
+    }
+
+    private void ApplyTrackingState(RuntimeArtworkData data, bool activelyTracked, bool triggerHapticOnGain)
+    {
         bool wasActivelyTracked = data.isActivelyTracked;
         data.isActivelyTracked = activelyTracked;
-        runtimeArtworkMap[artworkId] = data;
+        runtimeArtworkMap[data.artworkId] = data;
 
         if (activelyTracked)
         {
-            if (!wasActivelyTracked)
+            if (!wasActivelyTracked && triggerHapticOnGain)
                 MOST_HapticFeedback.Generate(MOST_HapticFeedback.HapticTypes.LightImpact);
 
-            MarkArtworkTracking(artworkId);
+            if (!wasActivelyTracked)
+                MarkArtworkTracking(data.artworkId);
+
             OnArtworkTracked(data);
+            return;
         }
-        else
-        {
+
+        if (wasActivelyTracked)
             OnArtworkLost(data);
-            MarkArtworkLost(artworkId);
-        }
+
+        MarkArtworkLost(data.artworkId);
     }
 
     private void OnArtworkTracked(RuntimeArtworkData data)
@@ -282,10 +312,9 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         data.videoSurface?.HideQuad();
 
-        bool waitingForVideo = artworksInLoadingState.Contains(data.artworkId) || !data.isVideoReady;
-        if (waitingForVideo)
+        if (string.IsNullOrWhiteSpace(data.remoteVideoUrl) && !ArtworkSessionCache.HasVideo(data.artworkId))
         {
-            SetLoadingCanvasActive(data.artworkId, true);
+            SetLoadingCanvasActive(data.artworkId, false);
             return;
         }
 

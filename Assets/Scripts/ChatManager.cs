@@ -3,6 +3,7 @@ using System.Collections;
 using System.Text;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using Vuforia;
@@ -34,6 +35,7 @@ public class ChatManager : MonoBehaviour
     [SerializeField] private float keyboardPadding = 16f;
     [SerializeField] private float keyboardFallbackScreenPercent = 0.38f;
     [SerializeField] private float keyboardMoveSpeed = 14f;
+    [SerializeField] private float keyboardHideGraceSeconds = 0.35f;
 
     private const string apiurl = "https://api.scripictural.tecshield.net/api/artworks/ask-ai";
 
@@ -52,6 +54,8 @@ public class ChatManager : MonoBehaviour
     private Vector2 originalSubmitAnchoredPos;
     private float currentKeyboardOffset;
     private float lastAppliedKeyboardOffset = -1f;
+    private float cachedKeyboardHeight;
+    private float keyboardVisibleUntil;
 
     public bool IsChatOpen => chatParent != null && chatParent.activeSelf;
 
@@ -80,7 +84,7 @@ public class ChatManager : MonoBehaviour
         if (submitRect != null)
             originalSubmitAnchoredPos = submitRect.anchoredPosition;
 
-        submitButton.onClick.AddListener(OnSubmitClicked);
+        WireSubmitButton();
         openChatBotButton.onClick.AddListener(OpenChatBot);
         closeChatBotButton.onClick.AddListener(CloseChatBot);
 
@@ -97,7 +101,7 @@ public class ChatManager : MonoBehaviour
 
     private void OnDestroy()
     {
-        submitButton.onClick.RemoveListener(OnSubmitClicked);
+        UnwireSubmitButton();
         openChatBotButton.onClick.RemoveListener(OpenChatBot);
         closeChatBotButton.onClick.RemoveListener(CloseChatBot);
         SetCameraPaused(false);
@@ -133,6 +137,12 @@ public class ChatManager : MonoBehaviour
         openChatBotButton.gameObject.SetActive(false);
         closeChatBotButton.gameObject.SetActive(true);
 
+
+        ClearMessages();
+        descriptionShown = false;
+        EnsureDescriptionShown();
+
+
         SetCameraPaused(true);
         EnsureDescriptionShown();
         ScrollToBottom();
@@ -141,6 +151,7 @@ public class ChatManager : MonoBehaviour
 
     private void CloseChatBot()
     {
+
         ResetKeyboardLayout();
         chatParent.SetActive(false);
         openChatBotButton.gameObject.SetActive(true);
@@ -150,6 +161,8 @@ public class ChatManager : MonoBehaviour
 
     private void OnSubmitClicked()
     {
+        KeepInputFocused();
+
         if (isWaitingResponse)
             return;
 
@@ -161,7 +174,7 @@ public class ChatManager : MonoBehaviour
         AddMyMessage(message);
 
         textInput.text = "";
-        textInput.ActivateInputField();
+        KeepInputFocused();
 
         AskAiBody body = new AskAiBody
         {
@@ -246,8 +259,54 @@ public class ChatManager : MonoBehaviour
     {
         isWaitingResponse = false;
         submitButton.interactable = true;
-        textInput.ActivateInputField();
+        KeepInputFocused();
         ScrollToBottom();
+    }
+
+    private void WireSubmitButton()
+    {
+        if (submitButton == null)
+            return;
+
+        Navigation nav = submitButton.navigation;
+        nav.mode = Navigation.Mode.None;
+        submitButton.navigation = nav;
+
+        ChatSendPointerHandler pointerHandler = submitButton.GetComponent<ChatSendPointerHandler>();
+        if (pointerHandler == null)
+            pointerHandler = submitButton.gameObject.AddComponent<ChatSendPointerHandler>();
+        pointerHandler.Bind(OnSubmitClicked);
+
+        if (textInput != null)
+            textInput.onSubmit.AddListener(OnInputSubmitted);
+    }
+
+    private void UnwireSubmitButton()
+    {
+        if (textInput != null)
+            textInput.onSubmit.RemoveListener(OnInputSubmitted);
+
+        if (submitButton == null)
+            return;
+
+        ChatSendPointerHandler pointerHandler = submitButton.GetComponent<ChatSendPointerHandler>();
+        if (pointerHandler != null)
+            pointerHandler.Bind(null);
+    }
+
+    private void OnInputSubmitted(string _)
+    {
+        OnSubmitClicked();
+    }
+
+    private void KeepInputFocused()
+    {
+        if (textInput == null)
+            return;
+
+        textInput.ActivateInputField();
+        textInput.Select();
+        textInput.MoveTextEnd(false);
     }
 
     private IEnumerator AnimateDots(MessageItemUi bubble)
@@ -396,21 +455,36 @@ public class ChatManager : MonoBehaviour
     {
         currentKeyboardOffset = 0f;
         lastAppliedKeyboardOffset = -1f;
+        cachedKeyboardHeight = 0f;
+        keyboardVisibleUntil = 0f;
         ApplyKeyboardLayout(0f);
     }
 
     private float GetKeyboardHeight()
     {
-        if (!textInput.isFocused || !TouchScreenKeyboard.visible)
+        if (textInput == null)
             return 0f;
 
-        float keyboardHeight = TouchScreenKeyboard.area.height;
+        if (TouchScreenKeyboard.visible)
+        {
+            float keyboardHeight = TouchScreenKeyboard.area.height;
 
-        if (keyboardHeight <= 0f)
-            keyboardHeight = Screen.height * keyboardFallbackScreenPercent;
+            if (keyboardHeight <= 0f)
+                keyboardHeight = Screen.height * keyboardFallbackScreenPercent;
 
-        float scaleFactor = rootCanvas != null ? rootCanvas.scaleFactor : 1f;
-        return keyboardHeight / scaleFactor + keyboardPadding;
+            float scaleFactor = rootCanvas != null ? rootCanvas.scaleFactor : 1f;
+            cachedKeyboardHeight = keyboardHeight / scaleFactor + keyboardPadding;
+            keyboardVisibleUntil = Time.unscaledTime + keyboardHideGraceSeconds;
+            return cachedKeyboardHeight;
+        }
+
+        if (Time.unscaledTime < keyboardVisibleUntil)
+            return cachedKeyboardHeight;
+
+        if (textInput.isFocused && cachedKeyboardHeight > 0f)
+            return cachedKeyboardHeight;
+
+        return 0f;
     }
 
     private void SetCameraPaused(bool paused)
@@ -419,6 +493,21 @@ public class ChatManager : MonoBehaviour
             return;
 
         VuforiaBehaviour.Instance.enabled = !paused;
+    }
+}
+
+public class ChatSendPointerHandler : MonoBehaviour, IPointerDownHandler
+{
+    private Action onSubmit;
+
+    public void Bind(Action callback)
+    {
+        onSubmit = callback;
+    }
+
+    public void OnPointerDown(PointerEventData eventData)
+    {
+        onSubmit?.Invoke();
     }
 }
 

@@ -682,7 +682,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 22400762, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchoredPosition.y
-      value: -0.000076293945
+      value: -0.00009536743
       objectReference: {fileID: 0}
     - target: {fileID: 22426080, guid: 67117722a812a2e46ab8cb8eafbf5f5e, type: 3}
       propertyPath: m_AnchorMax.x
@@ -2418,7 +2418,6 @@ MonoBehaviour:
   keyboardPadding: 16
   keyboardFallbackScreenPercent: 0.38
   keyboardMoveSpeed: 14
-  keyboardHideGraceSeconds: 0.1
 --- !u!1 &1940150368
 GameObject:
   m_ObjectHideFlags: 0

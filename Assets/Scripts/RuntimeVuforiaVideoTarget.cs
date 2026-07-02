@@ -78,6 +78,7 @@ public class RuntimeVuforiaVideoTarget : MonoBehaviour
 
         GameObject videoRoot = new GameObject("RuntimeVideo");
         videoSurface = videoRoot.AddComponent<VuforiaArtworkVideoSurface>();
+        
         await videoSurface.SetupAsync(
             imageTarget.transform,
             targetTexture,

@@ -52,6 +52,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
         if (!tracked)
         {
+            IsVideoPrepared = false;
             HideQuad();
             PauseVideo();
             return;
