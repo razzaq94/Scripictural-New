@@ -20,6 +20,10 @@ public class ChatManager : MonoBehaviour
     [SerializeField] private ScrollRect scrollRect;
     [SerializeField] private Button openChatBotButton;
     [SerializeField] private Button closeChatBotButton;
+    [SerializeField] private TMP_Text artworkTitleText;
+
+    [SerializeField] private Button descriptionOpenButton;
+    [SerializeField] private Button descriptionCloseButton;
 
     [Header("Message Prefabs")]
     [SerializeField] private MessageItemUi myMessageItem;
@@ -37,10 +41,19 @@ public class ChatManager : MonoBehaviour
     [SerializeField] private float keyboardMoveSpeed = 14f;
     [SerializeField] private float keyboardHideGraceSeconds = 0.35f;
 
+    [SerializeField] private RawImage frozenCameraImage;
+
+    private Texture2D frozenFrameTexture;
+    private bool isOpeningChat;
+
     private const string apiurl = "https://api.scripictural.tecshield.net/api/artworks/ask-ai";
+    private const string UnpublishedArtworkMessage = "Artwork not published";
+    private const string ScanArtworkFirstMessage = "Scan any artwork first";
 
     private string artworkID = string.Empty;
+    private string cachedArtworkTitle = string.Empty;
     private string cachedDescription = string.Empty;
+    private bool isCurrentArtworkPublished = true;
     private bool descriptionShown;
     private bool isWaitingResponse;
 
@@ -90,8 +103,12 @@ public class ChatManager : MonoBehaviour
 
         closeChatBotButton.gameObject.SetActive(false);
 
+        EnsureArtworkTitleText();
+        RefreshArtworkTitleDisplay();
+        ApplyChatInputState();
+
         //SetCurrentArtworkId("6a3912a0f8cafc946b54df95");
-        EnsureDescriptionShown();
+        //EnsureDescriptionShown();
     }
 
     private void Update()
@@ -105,13 +122,14 @@ public class ChatManager : MonoBehaviour
         openChatBotButton.onClick.RemoveListener(OpenChatBot);
         closeChatBotButton.onClick.RemoveListener(CloseChatBot);
         SetCameraPaused(false);
+        ClearFrozenFrame();
     }
 
     private void OnEnable()
     {
         ClearMessages();
         descriptionShown = false;
-        EnsureDescriptionShown();
+        //EnsureDescriptionShown();
     }
 
     public void SetCurrentDescription(string description)
@@ -124,43 +142,108 @@ public class ChatManager : MonoBehaviour
 
     public void SetCurrentArtworkId(string id)
     {
-        if (string.IsNullOrWhiteSpace(id))
-            return;
+        SetCurrentArtworkInfo(id, cachedArtworkTitle, isCurrentArtworkPublished);
+    }
 
-        artworkID = id;
-        Debug.Log("Artwork id set for chatbot: " + artworkID);
+    public void SetCurrentArtworkInfo(string id, string title, bool isPublished)
+    {
+        if (!string.IsNullOrWhiteSpace(id))
+        {
+            artworkID = id;
+            Debug.Log("Artwork id set for chatbot: " + artworkID);
+        }
+
+        cachedArtworkTitle = title ?? string.Empty;
+        isCurrentArtworkPublished = isPublished;
+        RefreshArtworkTitleDisplay();
+        ApplyChatInputState();
     }
 
     private void OpenChatBot()
     {
-        chatParent.SetActive(true);
-        openChatBotButton.gameObject.SetActive(false);
-        closeChatBotButton.gameObject.SetActive(true);
+        if (isOpeningChat || IsChatOpen)
+            return;
 
+        StartCoroutine(OpenChatBotRoutine());
+    }
+
+    private IEnumerator OpenChatBotRoutine()
+    {
+        isOpeningChat = true;
+
+        openChatBotButton.gameObject.SetActive(false);
+        closeChatBotButton.gameObject.SetActive(false);
+
+        descriptionCloseButton.gameObject.SetActive(false);
+        descriptionOpenButton.gameObject.SetActive(false);
+
+        yield return new WaitForEndOfFrame();
+
+        CaptureFrozenFrame();
+        SetCameraPaused(true);
+
+        chatParent.SetActive(true);
+        closeChatBotButton.gameObject.SetActive(true);
 
         ClearMessages();
         descriptionShown = false;
-        EnsureDescriptionShown();
 
-
-        SetCameraPaused(true);
-        EnsureDescriptionShown();
+        RefreshArtworkTitleDisplay();
+        ApplyChatInputState();
         ScrollToBottom();
-        textInput.ActivateInputField();
+
+        if (isCurrentArtworkPublished && HasScannedArtwork())
+            textInput.ActivateInputField();
+
+        isOpeningChat = false;
     }
 
     private void CloseChatBot()
     {
-
         ResetKeyboardLayout();
+
         chatParent.SetActive(false);
         openChatBotButton.gameObject.SetActive(true);
         closeChatBotButton.gameObject.SetActive(false);
+
         SetCameraPaused(false);
+        ClearFrozenFrame();
+
+        descriptionCloseButton.gameObject.SetActive(false);
+        descriptionOpenButton.gameObject.SetActive(true);
+    }
+    private void CaptureFrozenFrame()
+    {
+        ClearFrozenFrame();
+
+        frozenFrameTexture = ScreenCapture.CaptureScreenshotAsTexture();
+
+        if (frozenCameraImage == null)
+            return;
+
+        frozenCameraImage.texture = frozenFrameTexture;
+        frozenCameraImage.gameObject.SetActive(true);
     }
 
+    private void ClearFrozenFrame()
+    {
+        if (frozenCameraImage != null)
+        {
+            frozenCameraImage.texture = null;
+            frozenCameraImage.gameObject.SetActive(false);
+        }
+
+        if (frozenFrameTexture != null)
+        {
+            Destroy(frozenFrameTexture);
+            frozenFrameTexture = null;
+        }
+    }
     private void OnSubmitClicked()
     {
+        if (!HasScannedArtwork() || !isCurrentArtworkPublished)
+            return;
+
         KeepInputFocused();
 
         if (isWaitingResponse)
@@ -188,7 +271,7 @@ public class ChatManager : MonoBehaviour
     private IEnumerator SendApiAiRequest(AskAiBody aiBody)
     {
         isWaitingResponse = true;
-        submitButton.interactable = false;
+        ApplyChatInputState();
 
         MessageItemUi responseBubble = AddResponseBubble("...");
         dotsCoroutine = StartCoroutine(AnimateDots(responseBubble));
@@ -258,7 +341,7 @@ public class ChatManager : MonoBehaviour
     private void ResetWaitingState()
     {
         isWaitingResponse = false;
-        submitButton.interactable = true;
+        ApplyChatInputState();
         KeepInputFocused();
         ScrollToBottom();
     }
@@ -301,12 +384,77 @@ public class ChatManager : MonoBehaviour
 
     private void KeepInputFocused()
     {
-        if (textInput == null)
+        if (textInput == null || !isCurrentArtworkPublished || !HasScannedArtwork())
             return;
 
         textInput.ActivateInputField();
         textInput.Select();
         textInput.MoveTextEnd(false);
+    }
+
+    private void EnsureArtworkTitleText()
+    {
+        if (artworkTitleText != null || chatParent == null)
+            return;
+
+        Transform existing = chatParent.transform.Find("ArtworkTitleText");
+        if (existing != null)
+        {
+            artworkTitleText = existing.GetComponent<TMP_Text>();
+            return;
+        }
+
+        GameObject titleGo = new GameObject("ArtworkTitleText", typeof(RectTransform));
+        titleGo.transform.SetParent(chatParent.transform, false);
+
+        RectTransform rect = titleGo.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.05f, 0.9f);
+        rect.anchorMax = new Vector2(0.95f, 0.98f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        TextMeshProUGUI titleLabel = titleGo.AddComponent<TextMeshProUGUI>();
+        titleLabel.fontSize = 24f;
+        titleLabel.alignment = TextAlignmentOptions.Center;
+        titleLabel.color = Color.white;
+        titleLabel.text = string.Empty;
+        artworkTitleText = titleLabel;
+    }
+
+    private void RefreshArtworkTitleDisplay()
+    {
+        if (artworkTitleText == null)
+            return;
+
+        if (!HasScannedArtwork())
+        {
+            artworkTitleText.text = ScanArtworkFirstMessage;
+            return;
+        }
+
+        artworkTitleText.text = isCurrentArtworkPublished
+            ? cachedArtworkTitle
+            : UnpublishedArtworkMessage;
+    }
+
+    private bool HasScannedArtwork() => !string.IsNullOrWhiteSpace(artworkID);
+
+    private void ApplyChatInputState()
+    {
+        bool canSend = HasScannedArtwork() && isCurrentArtworkPublished && !isWaitingResponse;
+        bool canType = HasScannedArtwork() && isCurrentArtworkPublished;
+
+        if (textInput != null)
+        {
+            textInput.interactable = canType;
+            textInput.readOnly = !canType;
+
+            if (!canType)
+                textInput.text = string.Empty;
+        }
+
+        if (submitButton != null)
+            submitButton.interactable = canSend;
     }
 
     private IEnumerator AnimateDots(MessageItemUi bubble)

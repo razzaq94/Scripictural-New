@@ -152,6 +152,7 @@ public class ServerManager : MonoBehaviour
     {
         public bool matched;
         public string artworkId;
+        public bool isPublished;
         public float confidence;
         public BoundingBox boundingBox;
         public MatchArtwork artwork;
@@ -174,6 +175,7 @@ public class ServerManager : MonoBehaviour
         public string imageURL;
         public string compressedVideoUrl;
         public string originalVideoUrl;
+        public bool isPublished;
         public ArtworkMetaData metaData;
     }
 

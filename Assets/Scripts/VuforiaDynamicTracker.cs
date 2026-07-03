@@ -66,8 +66,17 @@ public class VuforiaDynamicTracker : MonoBehaviour
             ? detectData.artwork.compressedVideoUrl
             : string.Empty;
 
-        ChatManager.instance.SetCurrentArtworkId(detectData.artworkId);
-        ChatManager.instance.SetCurrentDescription(detectData.artwork.metaData.description);
+        ChatManager.instance.SetCurrentArtworkInfo(
+            detectData.artworkId,
+            detectData.artwork?.metaData?.title,
+            IsArtworkPublished(detectData));
+
+        if (detectData.artwork?.metaData != null)
+        {
+            ChatManager.instance.SetCurrentDescription(detectData.artwork.metaData.description);
+            DescriptionManager.Instance.AddDescription(detectData.artwork.metaData.description);
+            DescriptionManager.Instance.AddTitle(detectData.artwork.metaData.title);
+        }
 
         OnArtworkDetected(detectData.artworkId, imageUrl, videoUrl);
     }
@@ -479,6 +488,14 @@ public class VuforiaDynamicTracker : MonoBehaviour
         Renderer previewRenderer = target.GetComponentInChildren<Renderer>();
         if (previewRenderer != null)
             previewRenderer.enabled = visible;
+    }
+
+    private static bool IsArtworkPublished(ServerManager.MatchResponse detectData)
+    {
+        if (detectData?.artwork != null)
+            return detectData.artwork.isPublished;
+
+        return detectData == null || detectData.isPublished;
     }
 
     private string ResolveUrl(string value)
