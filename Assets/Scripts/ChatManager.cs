@@ -7,6 +7,7 @@ using UnityEngine.EventSystems;
 using UnityEngine.Networking;
 using UnityEngine.UI;
 using Vuforia;
+using Image = UnityEngine.UI.Image;
 
 public class ChatManager : MonoBehaviour
 {
@@ -42,6 +43,8 @@ public class ChatManager : MonoBehaviour
     [SerializeField] private float keyboardHideGraceSeconds = 0.35f;
 
     [SerializeField] private RawImage frozenCameraImage;
+
+    [SerializeField] private Image backgroundImage;
 
     private Texture2D frozenFrameTexture;
     private bool isOpeningChat;
@@ -184,6 +187,8 @@ public class ChatManager : MonoBehaviour
         descriptionCloseButton.gameObject.SetActive(false);
         descriptionOpenButton.gameObject.SetActive(false);
 
+        backgroundImage.gameObject.SetActive(true);
+
         yield return new WaitForEndOfFrame();
 
         CaptureFrozenFrame();
@@ -214,6 +219,7 @@ public class ChatManager : MonoBehaviour
 
         SetCameraPaused(false);
         ClearFrozenFrame();
+        backgroundImage.gameObject.SetActive(false);
 
         descriptionCloseButton.gameObject.SetActive(false);
         descriptionOpenButton.gameObject.SetActive(true);

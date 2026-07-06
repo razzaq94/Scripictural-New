@@ -3,6 +3,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Vuforia;
+using Image = UnityEngine.UI.Image;
 
 public class DescriptionManager : MonoBehaviour
 {
@@ -22,12 +23,12 @@ public class DescriptionManager : MonoBehaviour
 
     [SerializeField] private RawImage frozenCameraImage;
     [SerializeField] private float descriptionHorizontalPadding = 32f;
+    [SerializeField] private Image backgroundImage;
 
     private string cachedDescription = string.Empty;
     private string cachedTitle = string.Empty;
     private Texture2D frozenFrameTexture;
     private bool isOpening;
-
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -112,6 +113,7 @@ public class DescriptionManager : MonoBehaviour
         CaptureFrozenFrame();
 
         SetCameraPaused(true);
+        backgroundImage.gameObject.SetActive(true);
 
         if (!string.IsNullOrEmpty(cachedTitle) && !string.IsNullOrEmpty(cachedDescription))
         {
@@ -189,6 +191,7 @@ public class DescriptionManager : MonoBehaviour
         chatCloseButton.SetActive(false);
         chatOpenButton.SetActive(true);
 
+        backgroundImage.gameObject.SetActive(false);
         SetCameraPaused(false);
         ClearFrozenFrame();
     }
