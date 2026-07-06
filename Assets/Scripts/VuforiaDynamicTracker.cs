@@ -73,7 +73,6 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         if (detectData.artwork?.metaData != null)
         {
-            ChatManager.instance.SetCurrentDescription(detectData.artwork.metaData.description);
             DescriptionManager.Instance.AddDescription(detectData.artwork.metaData.description);
             DescriptionManager.Instance.AddTitle(detectData.artwork.metaData.title);
         }

@@ -2136,7 +2136,7 @@ MonoBehaviour:
   m_AsteriskChar: 42
   m_KeyboardType: 0
   m_LineType: 0
-  m_HideMobileInput: 0
+  m_HideMobileInput: 1
   m_HideSoftKeyboard: 0
   m_CharacterValidation: 0
   m_RegexValue: 
@@ -2166,12 +2166,12 @@ MonoBehaviour:
   m_OnTouchScreenKeyboardStatusChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_CaretColor: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
-  m_CustomCaretColor: 0
+  m_CaretColor: {r: 0, g: 0, b: 0, a: 1}
+  m_CustomCaretColor: 1
   m_SelectionColor: {r: 0.65882355, g: 0.80784315, b: 1, a: 0.7529412}
   m_Text: 
   m_CaretBlinkRate: 0.85
-  m_CaretWidth: 1
+  m_CaretWidth: 2
   m_ReadOnly: 0
   m_RichText: 1
   m_GlobalFontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2729,10 +2729,10 @@ RectTransform:
   m_Father: {fileID: 1327150600}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
-  m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 381.1712, y: -2586.545}
-  m_SizeDelta: {x: 762.3424, y: 5173.09}
-  m_Pivot: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1211903806
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2745,7 +2745,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 306cc8c2b49d7114eaa3623786fc2126, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.LayoutElement
-  m_IgnoreLayout: 0
+  m_IgnoreLayout: 1
   m_MinWidth: -1
   m_MinHeight: -1
   m_PreferredWidth: -1
@@ -2781,57 +2781,7 @@ MonoBehaviour:
     posuere. Vivamus posuere, urna at gravida interdum, nisl lectus malesuada mauris,
     vel luctus neque mauris nec justo.
 
-
-    Early each morning, the small park filled
-    with a quiet rhythm as joggers traced familiar paths beneath tall trees. Birds
-    called from the branches while the sunlight slowly spread across the grass. A
-    gardener paused to water bright flowers along the walkway, greeting passersby
-    with a friendly smile. By midday, families gathered on benches, children chased
-    one another across the open field, and the peaceful atmosphere became a lively
-    scene of conversation and laughter.
-
-
-    Technology continues to influence nearly
-    every aspect of modern life, from the way people communicate to how businesses
-    operate. Cloud computing, artificial intelligence, and automation have made many
-    tasks faster and more efficient. At the same time, these advancements have raised
-    important discussions about privacy, cybersecurity, and the changing nature of
-    work. As innovation progresses, individuals and organizations alike must balance
-    convenience with responsible use of technology.
-
-
-    On a cool autumn afternoon,
-    a traveler wandered through a quiet village lined with stone cottages and narrow
-    streets. The scent of freshly baked bread drifted from a nearby bakery, while
-    colorful leaves swirled gently in the breeze. Local artists displayed handmade
-    pottery and paintings in small shops, inviting visitors to explore their work.
-    The unhurried pace of the village offered a welcome contrast to the bustle of
-    city life.
-
-
-    Learning a new skill often begins with curiosity, but progress
-    depends on consistent practice and patience. Small improvements made over time
-    can lead to significant growth, even when results are not immediately visible.
-    Mistakes provide valuable opportunities to refine techniques and deepen understanding.
-    By setting realistic goals and maintaining a steady routine, anyone can build
-    confidence and develop expertise in areas that once seemed challenging.
-
-
-    As
-    evening approached, the sky shifted through shades of orange, pink, and deep
-    purple before the first stars appeared. The air became cooler, and the sounds
-    of the day gradually faded into a calm silence. Lights flickered on in distant
-    homes, reflecting softly across a nearby lake. It was a reminder that even the
-    busiest days eventually give way to moments of stillness and reflection.
-
-
-    Scientific
-    exploration has expanded humanity''s understanding of the universe in remarkable
-    ways. Powerful telescopes reveal distant galaxies, while sophisticated instruments
-    study the composition of planets, stars, and cosmic phenomena. Each new discovery
-    raises additional questions, encouraging researchers to continue investigating
-    the origins of the universe and the possibilities that exist beyond our own solar
-    system.'
+'
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -2865,8 +2815,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 0
-  m_HorizontalAlignment: 1
-  m_VerticalAlignment: 256
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1
@@ -3024,8 +2974,8 @@ RectTransform:
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 1, y: 1}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 5173.09}
-  m_Pivot: {x: 0, y: 1}
+  m_SizeDelta: {x: 0, y: 774.72}
+  m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1327150601
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3033,7 +2983,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1327150599}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 3245ec927659c4140ac4f8d17403cc18, type: 3}
   m_Name: 
@@ -3047,7 +2997,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1327150599}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 59f8146938fff824cb5fd77236b75775, type: 3}
   m_Name: 
@@ -3057,7 +3007,7 @@ MonoBehaviour:
     m_Right: 0
     m_Top: 0
     m_Bottom: 0
-  m_ChildAlignment: 0
+  m_ChildAlignment: 4
   m_Spacing: 0
   m_ChildForceExpandWidth: 1
   m_ChildForceExpandHeight: 1
@@ -3219,10 +3169,10 @@ RectTransform:
   m_Children: []
   m_Father: {fileID: 1548698960}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0.054592434}
-  m_AnchorMax: {x: 0.841, y: 1}
-  m_AnchoredPosition: {x: 0.47937012, y: -3}
-  m_SizeDelta: {x: 0.9588928, y: 6}
+  m_AnchorMin: {x: 0, y: 0}
+  m_AnchorMax: {x: 1, y: 1}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1434639183
 MonoBehaviour:
@@ -3295,7 +3245,7 @@ MonoBehaviour:
   parentLinkedComponent: {fileID: 0}
   m_enableKerning: 0
   m_ActiveFontFeatures: 6e72656b
-  m_enableExtraPadding: 1
+  m_enableExtraPadding: 0
   checkPaddingRequired: 0
   m_isRichText: 1
   m_EmojiFallbackSupport: 1
@@ -3374,7 +3324,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3312d7739989d2b4e91e6319e9a96d76, type: 3}
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.RectMask2D
-  m_Padding: {x: -8, y: -5, z: -8, w: -5}
+  m_Padding: {x: 0, y: 0, z: 0, w: 0}
   m_Softness: {x: 0, y: 0}
 --- !u!1 &1705064376
 GameObject:
@@ -3540,7 +3490,10 @@ MonoBehaviour:
   descriptionPanel: {fileID: 1045167874}
   artworkTitle: {fileID: 1791912053}
   artworkDescription: {fileID: 1211903807}
+  descriptionScrollRect: {fileID: 396846855}
+  descriptionContent: {fileID: 1327150600}
   frozenCameraImage: {fileID: 105640695}
+  descriptionHorizontalPadding: 32
 --- !u!1 &1791912051
 GameObject:
   m_ObjectHideFlags: 0
@@ -3625,14 +3578,14 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 36
-  m_fontSizeBase: 36
+  m_fontSize: 55
+  m_fontSizeBase: 55
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
   m_fontSizeMax: 72
-  m_fontStyle: 0
-  m_HorizontalAlignment: 2
+  m_fontStyle: 1
+  m_HorizontalAlignment: 16
   m_VerticalAlignment: 512
   m_textAlignment: 65535
   m_characterSpacing: 0

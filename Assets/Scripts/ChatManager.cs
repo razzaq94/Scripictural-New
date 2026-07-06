@@ -52,9 +52,7 @@ public class ChatManager : MonoBehaviour
 
     private string artworkID = string.Empty;
     private string cachedArtworkTitle = string.Empty;
-    private string cachedDescription = string.Empty;
     private bool isCurrentArtworkPublished = true;
-    private bool descriptionShown;
     private bool isWaitingResponse;
 
     private Coroutine dotsCoroutine;
@@ -98,6 +96,7 @@ public class ChatManager : MonoBehaviour
             originalSubmitAnchoredPos = submitRect.anchoredPosition;
 
         WireSubmitButton();
+        ConfigureInputFieldCaret();
         openChatBotButton.onClick.AddListener(OpenChatBot);
         closeChatBotButton.onClick.AddListener(CloseChatBot);
 
@@ -106,9 +105,6 @@ public class ChatManager : MonoBehaviour
         EnsureArtworkTitleText();
         RefreshArtworkTitleDisplay();
         ApplyChatInputState();
-
-        //SetCurrentArtworkId("6a3912a0f8cafc946b54df95");
-        //EnsureDescriptionShown();
     }
 
     private void Update()
@@ -128,16 +124,6 @@ public class ChatManager : MonoBehaviour
     private void OnEnable()
     {
         ClearMessages();
-        descriptionShown = false;
-        //EnsureDescriptionShown();
-    }
-
-    public void SetCurrentDescription(string description)
-    {
-        cachedDescription = description;
-
-        if (isActiveAndEnabled)
-            EnsureDescriptionShown();
     }
 
     public void SetCurrentArtworkId(string id)
@@ -186,7 +172,6 @@ public class ChatManager : MonoBehaviour
         closeChatBotButton.gameObject.SetActive(true);
 
         ClearMessages();
-        descriptionShown = false;
 
         RefreshArtworkTitleDisplay();
         ApplyChatInputState();
@@ -214,30 +199,30 @@ public class ChatManager : MonoBehaviour
     }
     private void CaptureFrozenFrame()
     {
-        ClearFrozenFrame();
+        // ClearFrozenFrame();
 
-        frozenFrameTexture = ScreenCapture.CaptureScreenshotAsTexture();
+        // frozenFrameTexture = ScreenCapture.CaptureScreenshotAsTexture();
 
-        if (frozenCameraImage == null)
-            return;
+        // if (frozenCameraImage == null)
+        //     return;
 
-        frozenCameraImage.texture = frozenFrameTexture;
-        frozenCameraImage.gameObject.SetActive(true);
+        // frozenCameraImage.texture = frozenFrameTexture;
+        // frozenCameraImage.gameObject.SetActive(true);
     }
 
     private void ClearFrozenFrame()
     {
-        if (frozenCameraImage != null)
-        {
-            frozenCameraImage.texture = null;
-            frozenCameraImage.gameObject.SetActive(false);
-        }
+        // if (frozenCameraImage != null)
+        // {
+        //     frozenCameraImage.texture = null;
+        //     frozenCameraImage.gameObject.SetActive(false);
+        // }
 
-        if (frozenFrameTexture != null)
-        {
-            Destroy(frozenFrameTexture);
-            frozenFrameTexture = null;
-        }
+        // if (frozenFrameTexture != null)
+        // {
+        //     Destroy(frozenFrameTexture);
+        //     frozenFrameTexture = null;
+        // }
     }
     private void OnSubmitClicked()
     {
@@ -346,6 +331,27 @@ public class ChatManager : MonoBehaviour
         ScrollToBottom();
     }
 
+    private void ConfigureInputFieldCaret()
+    {
+        if (textInput == null)
+            return;
+
+        textInput.text = string.Empty;
+        textInput.customCaretColor = true;
+        textInput.caretColor = Color.black;
+        textInput.caretWidth = 2;
+        textInput.caretBlinkRate = 0.85f;
+        // Required for TMP to render the in-field caret on mobile. When
+        // hide-mobile-input is off, the OS owns the caret and TMP draws none.
+        textInput.shouldHideMobileInput = true;
+
+        if (textInput.textComponent != null)
+            textInput.textComponent.verticalAlignment = VerticalAlignmentOptions.Middle;
+
+        if (textInput.placeholder is TMP_Text placeholderText)
+            placeholderText.verticalAlignment = VerticalAlignmentOptions.Middle;
+    }
+
     private void WireSubmitButton()
     {
         if (submitButton == null)
@@ -388,7 +394,6 @@ public class ChatManager : MonoBehaviour
             return;
 
         textInput.ActivateInputField();
-        textInput.Select();
         textInput.MoveTextEnd(false);
     }
 
@@ -481,22 +486,6 @@ public class ChatManager : MonoBehaviour
             StopCoroutine(dotsCoroutine);
             dotsCoroutine = null;
         }
-    }
-
-    private void EnsureDescriptionShown()
-    {
-        if (descriptionShown)
-            return;
-
-        if (string.IsNullOrWhiteSpace(cachedDescription))
-            return;
-
-        if (content == null)
-            return;
-
-        AddResponseBubble(cachedDescription);
-        descriptionShown = true;
-        ScrollToBottom();
     }
 
     private void AddMyMessage(string message)
@@ -637,10 +626,10 @@ public class ChatManager : MonoBehaviour
 
     private void SetCameraPaused(bool paused)
     {
-        if (VuforiaBehaviour.Instance == null)
-            return;
+        // if (VuforiaBehaviour.Instance == null)
+        //     return;
 
-        VuforiaBehaviour.Instance.enabled = !paused;
+        // VuforiaBehaviour.Instance.enabled = !paused;
     }
 }
 

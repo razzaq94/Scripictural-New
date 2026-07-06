@@ -17,8 +17,11 @@ public class DescriptionManager : MonoBehaviour
     [SerializeField] private GameObject descriptionPanel;
     [SerializeField] private TextMeshProUGUI artworkTitle;
     [SerializeField] private TextMeshProUGUI artworkDescription;
+    [SerializeField] private ScrollRect descriptionScrollRect;
+    [SerializeField] private RectTransform descriptionContent;
 
     [SerializeField] private RawImage frozenCameraImage;
+    [SerializeField] private float descriptionHorizontalPadding = 32f;
 
     private string cachedDescription = string.Empty;
     private string cachedTitle = string.Empty;
@@ -48,6 +51,19 @@ public class DescriptionManager : MonoBehaviour
 
         if (frozenCameraImage != null)
             frozenCameraImage.gameObject.SetActive(false);
+
+        ConfigureDescriptionText();
+    }
+
+    private void ConfigureDescriptionText()
+    {
+        if (artworkDescription == null)
+            return;
+
+        artworkDescription.horizontalAlignment = HorizontalAlignmentOptions.Center;
+        artworkDescription.verticalAlignment = VerticalAlignmentOptions.Middle;
+        artworkDescription.enableWordWrapping = true;
+        artworkDescription.overflowMode = TextOverflowModes.Overflow;
     }
 
     public void AddDescription(string msg)
@@ -96,7 +112,50 @@ public class DescriptionManager : MonoBehaviour
         descriptionCloseButton.gameObject.SetActive(true);
         descriptionOpenButton.gameObject.SetActive(false);
 
+        RefreshDescriptionLayout();
+
         isOpening = false;
+    }
+
+    private void RefreshDescriptionLayout()
+    {
+        if (descriptionContent == null || artworkDescription == null || descriptionScrollRect == null)
+            return;
+
+        RectTransform viewport = descriptionScrollRect.viewport;
+        if (viewport == null)
+            return;
+
+        Canvas.ForceUpdateCanvases();
+
+        float viewportWidth = viewport.rect.width;
+        float viewportHeight = viewport.rect.height;
+        float textWidth = viewportWidth - descriptionHorizontalPadding * 2f;
+
+        descriptionContent.anchorMin = new Vector2(0f, 1f);
+        descriptionContent.anchorMax = new Vector2(1f, 1f);
+        descriptionContent.pivot = new Vector2(0.5f, 1f);
+        descriptionContent.anchoredPosition = Vector2.zero;
+        descriptionContent.sizeDelta = new Vector2(0f, viewportHeight);
+
+        RectTransform textRect = artworkDescription.rectTransform;
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.pivot = new Vector2(0.5f, 0.5f);
+        textRect.offsetMin = new Vector2(descriptionHorizontalPadding, 0f);
+        textRect.offsetMax = new Vector2(-descriptionHorizontalPadding, 0f);
+
+        artworkDescription.ForceMeshUpdate(true);
+        float textHeight = artworkDescription.GetPreferredValues(
+            artworkDescription.text,
+            textWidth,
+            0f).y;
+
+        float contentHeight = Mathf.Max(textHeight, viewportHeight);
+        descriptionContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(descriptionContent);
+        descriptionScrollRect.verticalNormalizedPosition = 1f;
     }
 
     private void CloseDescriptionPanel()
@@ -117,37 +176,37 @@ public class DescriptionManager : MonoBehaviour
 
     private void CaptureFrozenFrame()
     {
-        ClearFrozenFrame();
+        // ClearFrozenFrame();
 
-        frozenFrameTexture = ScreenCapture.CaptureScreenshotAsTexture();
+        // frozenFrameTexture = ScreenCapture.CaptureScreenshotAsTexture();
 
-        if (frozenCameraImage == null)
-            return;
+        // if (frozenCameraImage == null)
+        //     return;
 
-        frozenCameraImage.texture = frozenFrameTexture;
-        frozenCameraImage.gameObject.SetActive(true);
+        // frozenCameraImage.texture = frozenFrameTexture;
+        // frozenCameraImage.gameObject.SetActive(true);
     }
 
     private void ClearFrozenFrame()
     {
-        if (frozenCameraImage != null)
-        {
-            frozenCameraImage.texture = null;
-            frozenCameraImage.gameObject.SetActive(false);
-        }
+        // if (frozenCameraImage != null)
+        // {
+        //     frozenCameraImage.texture = null;
+        //     frozenCameraImage.gameObject.SetActive(false);
+        // }
 
-        if (frozenFrameTexture != null)
-        {
-            Destroy(frozenFrameTexture);
-            frozenFrameTexture = null;
-        }
+        // if (frozenFrameTexture != null)
+        // {
+        //     Destroy(frozenFrameTexture);
+        //     frozenFrameTexture = null;
+        // }
     }
 
     private void SetCameraPaused(bool paused)
     {
-        if (VuforiaBehaviour.Instance == null)
-            return;
+        // if (VuforiaBehaviour.Instance == null)
+        //     return;
 
-        VuforiaBehaviour.Instance.enabled = !paused;
+        // VuforiaBehaviour.Instance.enabled = !paused;
     }
 }
