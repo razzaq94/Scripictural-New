@@ -758,9 +758,8 @@ public class VuforiaImageScanner : MonoBehaviour
 
     private bool IsScannerBlocked()
     {
-        if (ChatManager.instance != null && ChatManager.instance.IsChatOpen)
-            return true;
-
+        // Note: chat being open no longer blocks the scanner, so scanning a
+        // different artwork while chatting resets the chat for the new one.
         return vuforiaDynamicTracker != null && vuforiaDynamicTracker.ShouldBlockScanner();
     }
 

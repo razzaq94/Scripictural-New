@@ -41,7 +41,15 @@ public class VuforiaDynamicTracker : MonoBehaviour
     [SerializeField] private float scanUnlockDelay = 0.75f;
     [SerializeField] private float trackingHeartbeatTimeout = 1.0f;
 
+    private class ArtworkMetadata
+    {
+        public string title;
+        public string description;
+        public bool isPublished;
+    }
+
     private readonly Dictionary<string, RuntimeArtworkData> runtimeArtworkMap = new();
+    private readonly Dictionary<string, ArtworkMetadata> artworkMetadataMap = new();
     private readonly Dictionary<string, GameObject> spawnedLoadingCanvases = new();
     private readonly Dictionary<string, Texture2D> preloadedMarkerTextures = new();
     private readonly Dictionary<string, Coroutine> markerPreloadRoutines = new();
@@ -66,16 +74,16 @@ public class VuforiaDynamicTracker : MonoBehaviour
             ? detectData.artwork.compressedVideoUrl
             : string.Empty;
 
-        ChatManager.instance.SetCurrentArtworkInfo(
-            detectData.artworkId,
-            detectData.artwork?.metaData?.title,
-            IsArtworkPublished(detectData));
-
-        if (detectData.artwork?.metaData != null)
+        // Cache metadata so re-detections via local Vuforia tracking (which
+        // never reach the server again) can still update chat/description.
+        artworkMetadataMap[detectData.artworkId] = new ArtworkMetadata
         {
-            DescriptionManager.Instance.AddDescription(detectData.artwork.metaData.description);
-            DescriptionManager.Instance.AddTitle(detectData.artwork.metaData.title);
-        }
+            title = detectData.artwork?.metaData?.title,
+            description = detectData.artwork?.metaData?.description,
+            isPublished = IsArtworkPublished(detectData)
+        };
+
+        NotifyArtworkFocused(detectData.artworkId);
 
         OnArtworkDetected(detectData.artworkId, imageUrl, videoUrl);
     }
@@ -298,7 +306,13 @@ public class VuforiaDynamicTracker : MonoBehaviour
                 MOST_HapticFeedback.Generate(MOST_HapticFeedback.HapticTypes.LightImpact);
 
             if (!wasActivelyTracked)
+            {
                 MarkArtworkTracking(data.artworkId);
+                // Already-known artworks are recognized by Vuforia locally
+                // without a server round-trip, so push their cached info to
+                // the chat and description panels from here.
+                NotifyArtworkFocused(data.artworkId);
+            }
 
             OnArtworkTracked(data);
             return;
@@ -509,6 +523,21 @@ public class VuforiaDynamicTracker : MonoBehaviour
             return value;
 
         return assetBaseUrl.TrimEnd('/') + "/" + value.TrimStart('/');
+    }
+
+    private void NotifyArtworkFocused(string artworkId)
+    {
+        if (!artworkMetadataMap.TryGetValue(artworkId, out ArtworkMetadata meta))
+            return;
+
+        if (ChatManager.instance != null)
+            ChatManager.instance.SetCurrentArtworkInfo(artworkId, meta.title, meta.isPublished);
+
+        if (DescriptionManager.Instance != null)
+        {
+            DescriptionManager.Instance.AddTitle(meta.title);
+            DescriptionManager.Instance.AddDescription(meta.description);
+        }
     }
 
     public bool ShouldBlockScanner()

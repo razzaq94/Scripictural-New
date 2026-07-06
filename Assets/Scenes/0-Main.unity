@@ -498,8 +498,8 @@ RectTransform:
   - {fileID: 1327150600}
   m_Father: {fileID: 396846854}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0.10973208, y: -0.0000022121849}
-  m_AnchorMax: {x: 0.88899434, y: 0.999998}
+  m_AnchorMin: {x: 0.07321102, y: -0.0000022121849}
+  m_AnchorMax: {x: 0.9343611, y: 0.999998}
   m_AnchoredPosition: {x: 0, y: 0}
   m_SizeDelta: {x: 0, y: 0}
   m_Pivot: {x: 0, y: 1}
@@ -3528,8 +3528,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 2.9214, y: -40.932617}
-  m_SizeDelta: {x: 752.1326, y: 87.9771}
+  m_AnchoredPosition: {x: 18.7434, y: -46.5166}
+  m_SizeDelta: {x: 720.4887, y: 149.9043}
   m_Pivot: {x: 0.5, y: 1}
 --- !u!114 &1791912053
 MonoBehaviour:
@@ -3551,7 +3551,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: Artwork Not Published
+  m_text: Artwork Not Published you dumb
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3585,8 +3585,8 @@ MonoBehaviour:
   m_fontSizeMin: 18
   m_fontSizeMax: 72
   m_fontStyle: 1
-  m_HorizontalAlignment: 16
-  m_VerticalAlignment: 512
+  m_HorizontalAlignment: 2
+  m_VerticalAlignment: 256
   m_textAlignment: 65535
   m_characterSpacing: 0
   m_characterHorizontalScale: 1

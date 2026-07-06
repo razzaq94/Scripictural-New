@@ -57,6 +57,7 @@ public class ChatManager : MonoBehaviour
 
     private Coroutine dotsCoroutine;
     private Coroutine scrollCoroutine;
+    private Coroutine requestCoroutine;
 
     private RectTransform inputRect;
     private RectTransform submitRect;
@@ -133,14 +134,34 @@ public class ChatManager : MonoBehaviour
 
     public void SetCurrentArtworkInfo(string id, string title, bool isPublished)
     {
+        bool artworkChanged = false;
+
         if (!string.IsNullOrWhiteSpace(id))
         {
+            artworkChanged = !string.Equals(artworkID, id, StringComparison.Ordinal);
             artworkID = id;
             Debug.Log("Artwork id set for chatbot: " + artworkID);
         }
 
         cachedArtworkTitle = title ?? string.Empty;
         isCurrentArtworkPublished = isPublished;
+
+        // A different artwork was scanned: the old conversation no longer
+        // applies, so reset the chat for the new artwork.
+        if (artworkChanged && IsChatOpen)
+        {
+            StopDots();
+
+            if (requestCoroutine != null)
+            {
+                StopCoroutine(requestCoroutine);
+                requestCoroutine = null;
+            }
+
+            isWaitingResponse = false;
+            ClearMessages();
+        }
+
         RefreshArtworkTitleDisplay();
         ApplyChatInputState();
     }
@@ -250,7 +271,7 @@ public class ChatManager : MonoBehaviour
             question = message
         };
 
-        StartCoroutine(SendApiAiRequest(body));
+        requestCoroutine = StartCoroutine(SendApiAiRequest(body));
     }
 
     private IEnumerator SendApiAiRequest(AskAiBody aiBody)
@@ -326,6 +347,7 @@ public class ChatManager : MonoBehaviour
     private void ResetWaitingState()
     {
         isWaitingResponse = false;
+        requestCoroutine = null;
         ApplyChatInputState();
         KeepInputFocused();
         ScrollToBottom();

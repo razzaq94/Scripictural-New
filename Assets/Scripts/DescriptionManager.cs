@@ -60,8 +60,11 @@ public class DescriptionManager : MonoBehaviour
         if (artworkDescription == null)
             return;
 
-        artworkDescription.horizontalAlignment = HorizontalAlignmentOptions.Center;
+        // Left-aligned body text reads better than centered for paragraphs.
+        // Switch to HorizontalAlignmentOptions.Justified for a block look.
+        artworkDescription.horizontalAlignment = HorizontalAlignmentOptions.Left;
         artworkDescription.verticalAlignment = VerticalAlignmentOptions.Middle;
+        artworkDescription.lineSpacing = 12f;
         artworkDescription.enableWordWrapping = true;
         artworkDescription.overflowMode = TextOverflowModes.Overflow;
     }
@@ -69,11 +72,27 @@ public class DescriptionManager : MonoBehaviour
     public void AddDescription(string msg)
     {
         cachedDescription = msg;
+        RefreshOpenPanel();
     }
 
     public void AddTitle(string title)
     {
         cachedTitle = title;
+        RefreshOpenPanel();
+    }
+
+    // If a new artwork is scanned while the panel is open, update it live.
+    private void RefreshOpenPanel()
+    {
+        if (descriptionPanel == null || !descriptionPanel.activeSelf)
+            return;
+
+        if (string.IsNullOrEmpty(cachedTitle) || string.IsNullOrEmpty(cachedDescription))
+            return;
+
+        artworkTitle.text = cachedTitle;
+        artworkDescription.text = cachedDescription;
+        RefreshDescriptionLayout();
     }
 
     private void OpenDescriptionPanel()
