@@ -22,8 +22,18 @@ public class DescriptionManager : MonoBehaviour
     [SerializeField] private RectTransform descriptionContent;
 
     [SerializeField] private RawImage frozenCameraImage;
-    [SerializeField] private float descriptionHorizontalPadding = 32f;
     [SerializeField] private Image backgroundImage;
+
+    [Header("Typography")]
+    [SerializeField] private float titleFontSize = 60f;
+    [SerializeField] private float bodyFontSize = 56f;
+    // Reference uses ~default line spacing; paragraph gaps come from blank
+    // lines (\n\n) in the source text, so both values stay near zero.
+    [SerializeField] private float bodyLineSpacing = 5f;
+    [SerializeField] private float bodyParagraphSpacing = 0f;
+
+    [Header("Layout")]
+    [SerializeField] private float descriptionHorizontalPadding = 32f;
 
     private string cachedDescription = string.Empty;
     private string cachedTitle = string.Empty;
@@ -58,16 +68,29 @@ public class DescriptionManager : MonoBehaviour
 
     private void ConfigureDescriptionText()
     {
-        if (artworkDescription == null)
-            return;
+        // Title: bold, top of the panel. Alignment is decided dynamically in
+        // UpdateTitleAlignment (centered on one line, left when it wraps).
+        if (artworkTitle != null)
+        {
+            artworkTitle.verticalAlignment = VerticalAlignmentOptions.Top;
+            artworkTitle.fontStyle = FontStyles.Bold;
+            artworkTitle.fontSize = titleFontSize;
+            artworkTitle.enableWordWrapping = true;
+            artworkTitle.overflowMode = TextOverflowModes.Overflow;
+        }
 
-        // Left-aligned body text reads better than centered for paragraphs.
-        // Switch to HorizontalAlignmentOptions.Justified for a block look.
-        artworkDescription.horizontalAlignment = HorizontalAlignmentOptions.Left;
-        artworkDescription.verticalAlignment = VerticalAlignmentOptions.Middle;
-        artworkDescription.lineSpacing = 12f;
-        artworkDescription.enableWordWrapping = true;
-        artworkDescription.overflowMode = TextOverflowModes.Overflow;
+        // Body: left-aligned and TOP-aligned so text flows from the top down
+        // instead of being centered vertically.
+        if (artworkDescription != null)
+        {
+            artworkDescription.horizontalAlignment = HorizontalAlignmentOptions.Left;
+            artworkDescription.verticalAlignment = VerticalAlignmentOptions.Top;
+            artworkDescription.fontSize = bodyFontSize;
+            artworkDescription.lineSpacing = bodyLineSpacing;
+            artworkDescription.paragraphSpacing = bodyParagraphSpacing;
+            artworkDescription.enableWordWrapping = true;
+            artworkDescription.overflowMode = TextOverflowModes.Overflow;
+        }
     }
 
     public void AddDescription(string msg)
@@ -138,6 +161,19 @@ public class DescriptionManager : MonoBehaviour
         isOpening = false;
     }
 
+    // Centered when the title fits on one line, left-aligned once it wraps.
+    private void UpdateTitleAlignment()
+    {
+        if (artworkTitle == null)
+            return;
+
+        artworkTitle.ForceMeshUpdate();
+
+        artworkTitle.horizontalAlignment = artworkTitle.textInfo.lineCount > 1
+            ? HorizontalAlignmentOptions.Left
+            : HorizontalAlignmentOptions.Center;
+    }
+
     private void RefreshDescriptionLayout()
     {
         if (descriptionContent == null || artworkDescription == null || descriptionScrollRect == null)
@@ -149,10 +185,15 @@ public class DescriptionManager : MonoBehaviour
 
         Canvas.ForceUpdateCanvases();
 
+        UpdateTitleAlignment();
+
         float viewportWidth = viewport.rect.width;
         float viewportHeight = viewport.rect.height;
         float textWidth = viewportWidth - descriptionHorizontalPadding * 2f;
 
+        // Title position is left untouched here so it keeps whatever position
+        // you set in the scene. Only the scrolling body content is laid out.
+        // ---- Content fills the viewport width, grows with the text ----
         descriptionContent.anchorMin = new Vector2(0f, 1f);
         descriptionContent.anchorMax = new Vector2(1f, 1f);
         descriptionContent.pivot = new Vector2(0.5f, 1f);
@@ -172,6 +213,8 @@ public class DescriptionManager : MonoBehaviour
             textWidth,
             0f).y;
 
+        // Top-aligned text: content grows only when taller than the viewport,
+        // otherwise it fills the viewport and the text sits at the top.
         float contentHeight = Mathf.Max(textHeight, viewportHeight);
         descriptionContent.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, contentHeight);
 
