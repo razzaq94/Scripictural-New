@@ -7,9 +7,9 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Vuforia;
 
-public class VuforiaDynamicTracker : MonoBehaviour
+public class DynamicTracker : MonoBehaviour
 {
-    private const string LogTag = "[VuforiaDynamicTracker]";
+    private const string LogTag = "[DynamicTracker]";
 
     [System.Serializable]
     public class RuntimeArtworkData
@@ -21,7 +21,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
         public Texture2D markerTexture;
         public float aspect = 1f;
         public ImageTargetBehaviour imageTarget;
-        public VuforiaArtworkVideoSurface videoSurface;
+        public ArtworkVideoSurface videoSurface;
         public bool isVideoReady;
         public bool isActivelyTracked;
     }
@@ -74,7 +74,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
             ? detectData.artwork.compressedVideoUrl
             : string.Empty;
 
-        // Cache metadata so re-detections via local Vuforia tracking (which
+        // Cache metadata so re-detections via local tracking (which
         // never reach the server again) can still update chat/description.
         artworkMetadataMap[detectData.artworkId] = new ArtworkMetadata
         {
@@ -113,10 +113,10 @@ public class VuforiaDynamicTracker : MonoBehaviour
 
         ArtworkSessionCache.UpsertArtworkRecord(artworkId, resolvedImageUrl, resolvedVideoUrl);
         StartMarkerPreload(artworkId, resolvedImageUrl);
-        StartCoroutine(SetupVuforiaTarget(artworkId, resolvedImageUrl, resolvedVideoUrl));
+        StartCoroutine(SetupTarget(artworkId, resolvedImageUrl, resolvedVideoUrl));
     }
 
-    private IEnumerator SetupVuforiaTarget(string artworkId, string imageUrl, string videoUrl)
+    private IEnumerator SetupTarget(string artworkId, string imageUrl, string videoUrl)
     {
         processingArtworkIds.Add(artworkId);
         SetArtworkLoadingState(artworkId, true);
@@ -170,7 +170,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
         ImageTargetBehaviour imageTarget = createTask.Result;
         if (imageTarget == null)
         {
-            Debug.LogError(LogTag + " Vuforia failed to create image target for " + artworkId);
+            Debug.LogError(LogTag + " Failed to create image target for " + artworkId);
             FinishProcessing(artworkId);
             yield break;
         }
@@ -183,7 +183,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
         bool hasLocalVideo = ArtworkSessionCache.HasVideo(artworkId);
 
         GameObject videoRoot = new GameObject("ArtworkVideo_" + artworkId);
-        VuforiaArtworkVideoSurface videoSurface = videoRoot.AddComponent<VuforiaArtworkVideoSurface>();
+        ArtworkVideoSurface videoSurface = videoRoot.AddComponent<ArtworkVideoSurface>();
         System.Action preparedHandler = () => OnVideoSurfacePrepared(artworkId);
         preparedHandlers[artworkId] = preparedHandler;
         videoSurface.PreparedForPlayback += preparedHandler;
@@ -308,7 +308,7 @@ public class VuforiaDynamicTracker : MonoBehaviour
             if (!wasActivelyTracked)
             {
                 MarkArtworkTracking(data.artworkId);
-                // Already-known artworks are recognized by Vuforia locally
+                // Already-known artworks are recognized by local tracking
                 // without a server round-trip, so push their cached info to
                 // the chat and description panels from here.
                 NotifyArtworkFocused(data.artworkId);

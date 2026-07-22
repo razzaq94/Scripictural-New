@@ -2,6 +2,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.Networking;
 
 public class ServerManager : MonoBehaviour
@@ -16,7 +17,8 @@ public class ServerManager : MonoBehaviour
     [SerializeField, Range(1, 100)] private int minJpegQuality = 55;
     [SerializeField, Range(1, 20)] private int qualityStep = 5;
 
-    [SerializeField] private VuforiaImageScanner vuforiaImageScanner;
+    [FormerlySerializedAs("vuforiaImageScanner")]
+    [SerializeField] private ImageScanner imageScanner;
 
     private void Awake()
     {
@@ -141,8 +143,8 @@ public class ServerManager : MonoBehaviour
 
     private void Log(string message)
     {
-        if (vuforiaImageScanner != null)
-            vuforiaImageScanner.Log(message);
+        if (imageScanner != null)
+            imageScanner.Log(message);
         else
             Debug.Log(message);
     }

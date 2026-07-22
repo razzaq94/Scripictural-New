@@ -565,7 +565,7 @@ GameObject:
   - component: {fileID: 287742719}
   - component: {fileID: 287742718}
   m_Layer: 0
-  m_Name: VuforiaDynamicTracker
+  m_Name: DynamicTracker
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -582,7 +582,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 65ac4065f47800f43ad8632377bc82b5, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VuforiaDynamicTracker
+  m_EditorClassIdentifier: Assembly-CSharp::DynamicTracker
   physicalWidthMeters: 0.2
   cacheMarkerImages: 1
   videoMaterial: {fileID: 2100000, guid: 79a196e851a90b7408b42c8ee2c39cae, type: 2}
@@ -754,7 +754,7 @@ GameObject:
   - component: {fileID: 348720561}
   - component: {fileID: 348720560}
   m_Layer: 0
-  m_Name: VuforiaImageScanner
+  m_Name: ImageScanner
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -771,9 +771,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 533b80889d753784faf7b88041afd87e, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::VuforiaImageScanner
+  m_EditorClassIdentifier: Assembly-CSharp::ImageScanner
   debugText: {fileID: 0}
-  vuforiaDynamicTracker: {fileID: 287742718}
+  dynamicTracker: {fileID: 287742718}
   scanInterval: 0.1
   useOriginalCameraResolution: 0
   processingWidth: 480
@@ -1991,7 +1991,7 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 09569247be71da24ba57026fd25248c0, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::RuntimeVuforiaVideoTarget
+  m_EditorClassIdentifier: Assembly-CSharp::RuntimeVideoTarget
   imageUrl: https://yavuzceliker.github.io/sample-images/image-1021.jpg
   videoUrl: https://samplelib.com/lib/preview/mp4/sample-10s.mp4
   targetName: RuntimeImageTarget
@@ -2621,7 +2621,7 @@ MonoBehaviour:
   targetUploadSizeKb: 20
   minJpegQuality: 55
   qualityStep: 5
-  vuforiaImageScanner: {fileID: 348720560}
+  imageScanner: {fileID: 348720560}
 --- !u!4 &1078564964
 Transform:
   m_ObjectHideFlags: 0
@@ -2717,7 +2717,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 0
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 1
   m_TargetDisplay: 0
 --- !u!224 &1156914001
 RectTransform:
@@ -4016,5 +4016,5 @@ SceneRoots:
   - {fileID: 1078564964}
   - {fileID: 287742719}
   - {fileID: 348720561}
-  - {fileID: 1156914001}
   - {fileID: 1705064380}
+  - {fileID: 1156914001}

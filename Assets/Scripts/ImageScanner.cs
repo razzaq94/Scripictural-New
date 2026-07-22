@@ -2,13 +2,14 @@ using System.Collections;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.Serialization;
 using Vuforia;
 using Image = Vuforia.Image;
 #if UNITY_ANDROID && !UNITY_EDITOR
 using UnityEngine.Android;
 #endif
 
-public class VuforiaImageScanner : MonoBehaviour
+public class ImageScanner : MonoBehaviour
 {
     private static readonly PixelFormat[] PreferredCameraFormats =
     {
@@ -20,7 +21,8 @@ public class VuforiaImageScanner : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private TextMeshProUGUI debugText;
-    [SerializeField] private VuforiaDynamicTracker vuforiaDynamicTracker;
+    [FormerlySerializedAs("vuforiaDynamicTracker")]
+    [SerializeField] private DynamicTracker dynamicTracker;
 
     [Header("Scan Settings")]
     [SerializeField] private float scanInterval = 1f;
@@ -49,7 +51,7 @@ public class VuforiaImageScanner : MonoBehaviour
     private float timer;
     private bool isProcessing;
     private bool formatRegistered;
-    private bool vuforiaReady;
+    private bool engineReady;
     private bool hasCachedCameraFrame;
     private bool hasVideoBackgroundFrame;
     private PixelFormat activeCameraFormat = PixelFormat.UNKNOWN_FORMAT;
@@ -70,21 +72,21 @@ public class VuforiaImageScanner : MonoBehaviour
 
     private void Start()
     {
-        VuforiaApplication.Instance.OnVuforiaStarted += OnVuforiaStarted;
-        VuforiaApplication.Instance.OnVuforiaStopped += OnVuforiaStopped;
+        VuforiaApplication.Instance.OnVuforiaStarted += OnEngineStarted;
+        VuforiaApplication.Instance.OnVuforiaStopped += OnEngineStopped;
 
         if (VuforiaApplication.Instance.IsRunning)
-            OnVuforiaStarted();
+            OnEngineStarted();
 
         Log($"Scanner started | interval={scanInterval:F2}s | cooldown={sendCooldown:F2}s");
     }
 
     private void OnDestroy()
     {
-        DetachVuforiaHooks();
+        DetachEngineHooks();
 
-        VuforiaApplication.Instance.OnVuforiaStarted -= OnVuforiaStarted;
-        VuforiaApplication.Instance.OnVuforiaStopped -= OnVuforiaStopped;
+        VuforiaApplication.Instance.OnVuforiaStarted -= OnEngineStarted;
+        VuforiaApplication.Instance.OnVuforiaStopped -= OnEngineStopped;
 
         if (VuforiaApplication.Instance.IsRunning && formatRegistered)
             UnregisterCameraFormat();
@@ -99,16 +101,16 @@ public class VuforiaImageScanner : MonoBehaviour
             Destroy(videoBackgroundTexture);
     }
 
-    private void OnVuforiaStarted()
+    private void OnEngineStarted()
     {
 
         cameraTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
         videoBackgroundTexture = new Texture2D(4, 4, ProcessingTextureFormat, false);
         RegisterCameraFormat();
-        AttachVuforiaHooks();
-        vuforiaReady = true;
+        AttachEngineHooks();
+        engineReady = true;
         framesSinceFormatRegistration = 0;
-        Log($"Vuforia ready | formatRegistered={formatRegistered} | format={activeCameraFormat}");
+        Log($"Engine ready | formatRegistered={formatRegistered} | format={activeCameraFormat}");
 
         StartCoroutine(HideSplash());
     }
@@ -118,11 +120,11 @@ public class VuforiaImageScanner : MonoBehaviour
         splashCanvas.SetActive(false);
 
     }
-    private void OnVuforiaStopped()
+    private void OnEngineStopped()
     {
-        DetachVuforiaHooks();
+        DetachEngineHooks();
         UnregisterCameraFormat();
-        vuforiaReady = false;
+        engineReady = false;
         hasCachedCameraFrame = false;
         hasVideoBackgroundFrame = false;
         framesSinceFormatRegistration = 0;
@@ -140,13 +142,13 @@ public class VuforiaImageScanner : MonoBehaviour
         }
     }
 
-    private void AttachVuforiaHooks()
+    private void AttachEngineHooks()
     {
         if (VuforiaBehaviour.Instance == null)
             return;
 
-        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnVuforiaUpdated;
-        VuforiaBehaviour.Instance.World.OnStateUpdated += OnVuforiaUpdated;
+        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnEngineUpdated;
+        VuforiaBehaviour.Instance.World.OnStateUpdated += OnEngineUpdated;
 
         if (VuforiaBehaviour.Instance.VideoBackground != null)
         {
@@ -155,12 +157,12 @@ public class VuforiaImageScanner : MonoBehaviour
         }
     }
 
-    private void DetachVuforiaHooks()
+    private void DetachEngineHooks()
     {
         if (VuforiaBehaviour.Instance == null)
             return;
 
-        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnVuforiaUpdated;
+        VuforiaBehaviour.Instance.World.OnStateUpdated -= OnEngineUpdated;
 
         if (VuforiaBehaviour.Instance.VideoBackground != null)
             VuforiaBehaviour.Instance.VideoBackground.OnVideoBackgroundChanged -= OnVideoBackgroundChanged;
@@ -172,9 +174,9 @@ public class VuforiaImageScanner : MonoBehaviour
         CacheVideoBackgroundFrame();
     }
 
-    private void OnVuforiaUpdated()
+    private void OnEngineUpdated()
     {
-        if (!vuforiaReady || VuforiaBehaviour.Instance == null)
+        if (!engineReady || VuforiaBehaviour.Instance == null)
             return;
 
         framesSinceFormatRegistration++;
@@ -199,7 +201,7 @@ public class VuforiaImageScanner : MonoBehaviour
         catch (System.Exception ex)
         {
             if (verboseLogs)
-                Debug.LogWarning("[VuforiaScanner] CameraDevice capture failed: " + ex.Message);
+                Debug.LogWarning("[ImageScanner] CameraDevice capture failed: " + ex.Message);
         }
     }
 
@@ -233,7 +235,7 @@ public class VuforiaImageScanner : MonoBehaviour
         catch (System.Exception ex)
         {
             if (verboseLogs)
-                Debug.LogWarning("[VuforiaScanner] VideoBackground capture failed: " + ex.Message);
+                Debug.LogWarning("[ImageScanner] VideoBackground capture failed: " + ex.Message);
         }
     }
 
@@ -279,10 +281,10 @@ public class VuforiaImageScanner : MonoBehaviour
             return;
         }
 
-        if (!vuforiaReady)
+        if (!engineReady)
         {
             if (verboseLogs && Time.frameCount % 120 == 0)
-                Log("<color=#ffaa00>Waiting for Vuforia to start...</color>");
+                Log("<color=#ffaa00>Waiting for engine to start...</color>");
             return;
         }
 
@@ -368,10 +370,10 @@ public class VuforiaImageScanner : MonoBehaviour
                         {
                             Log($"<color=#00ffcc>MATCH: {response.artworkId}</color>");
 
-                            if (vuforiaDynamicTracker != null)
-                                vuforiaDynamicTracker.OnArtworkDetected(response);
+                            if (dynamicTracker != null)
+                                dynamicTracker.OnArtworkDetected(response);
                             else
-                                Log("<color=#ff4444>VuforiaDynamicTracker reference missing</color>");
+                                Log("<color=#ff4444>DynamicTracker reference missing</color>");
                         }
                         else
                         {
@@ -411,16 +413,16 @@ public class VuforiaImageScanner : MonoBehaviour
         if (!HasCameraPermission())
             return null;
 
-        if (!vuforiaReady)
+        if (!engineReady)
         {
             if (verboseLogs)
-                Log("<color=#ffaa00>Vuforia not ready yet</color>");
+                Log("<color=#ffaa00>Engine not ready yet</color>");
             return null;
         }
 
         if (formatRegistered && hasCachedCameraFrame && cameraTexture != null && cameraTexture.width > 0)
         {
-            lastCaptureSource = "vuforia-camera";
+            lastCaptureSource = "camera";
             return BuildProcessingFrame(cameraTexture, rotateForRawCamera: true);
         }
 
@@ -429,7 +431,7 @@ public class VuforiaImageScanner : MonoBehaviour
             CacheCameraDeviceFrame();
             if (hasCachedCameraFrame && cameraTexture.width > 0)
             {
-                lastCaptureSource = "vuforia-poll";
+                lastCaptureSource = "camera-poll";
                 return BuildProcessingFrame(cameraTexture, rotateForRawCamera: true);
             }
         }
@@ -437,15 +439,15 @@ public class VuforiaImageScanner : MonoBehaviour
         CacheVideoBackgroundFrame();
         if (hasVideoBackgroundFrame && videoBackgroundTexture != null && videoBackgroundTexture.width > 0)
         {
-            lastCaptureSource = "vuforia-video-background";
+            lastCaptureSource = "video-background";
             return BuildProcessingFrame(videoBackgroundTexture, rotateForRawCamera: false);
         }
 
         lastCaptureSource = "screen-fallback";
-        Log("<color=#ffaa00>WARNING: Vuforia camera unavailable. Using screen fallback.</color>");
+        Log("<color=#ffaa00>WARNING: Camera unavailable. Using screen fallback.</color>");
         if (verboseLogs)
         {
-            Log($"<color=#ffaa00>ready={vuforiaReady} format={formatRegistered}/{activeCameraFormat} " +
+            Log($"<color=#ffaa00>ready={engineReady} format={formatRegistered}/{activeCameraFormat} " +
                 $"cachedCamera={hasCachedCameraFrame} cachedVB={hasVideoBackgroundFrame} " +
                 $"warmupFrames={framesSinceFormatRegistration}</color>");
         }
@@ -555,9 +557,9 @@ public class VuforiaImageScanner : MonoBehaviour
         byte[] jpg = frame.EncodeToJPG(90);
         string path = System.IO.Path.Combine(
             Application.persistentDataPath,
-            $"vuforia_scan_{System.DateTime.Now:yyyyMMdd_HHmmss_fff}.jpg");
+            $"scan_{System.DateTime.Now:yyyyMMdd_HHmmss_fff}.jpg");
         System.IO.File.WriteAllBytes(path, jpg);
-        Debug.Log("[VuforiaScanner] Debug frame saved: " + path);
+        Debug.Log("[ImageScanner] Debug frame saved: " + path);
     }
 
     private Texture2D CaptureScreenFallback()
@@ -760,7 +762,7 @@ public class VuforiaImageScanner : MonoBehaviour
     {
         // Note: chat being open no longer blocks the scanner, so scanning a
         // different artwork while chatting resets the chat for the new one.
-        return vuforiaDynamicTracker != null && vuforiaDynamicTracker.ShouldBlockScanner();
+        return dynamicTracker != null && dynamicTracker.ShouldBlockScanner();
     }
 
     private void HandleTrackingBlockState(bool shouldBlockScanner)
@@ -798,7 +800,7 @@ public class VuforiaImageScanner : MonoBehaviour
 
     public void Log(string msg)
     {
-        //Debug.Log("[VuforiaScanner] " + msg);
+        //Debug.Log("[ImageScanner] " + msg);
 
         string stripped = msg;
         const string colorOpen = "<color=";

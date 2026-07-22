@@ -5,9 +5,9 @@ using Vuforia;
 
 /// <summary>
 /// Legacy/demo helper for a single hardcoded artwork.
-/// For the full dynamic server-recognition flow, use VuforiaImageScanner + VuforiaDynamicTracker.
+/// For the full dynamic server-recognition flow, use ImageScanner + DynamicTracker.
 /// </summary>
-public class RuntimeVuforiaVideoTarget : MonoBehaviour
+public class RuntimeVideoTarget : MonoBehaviour
 {
     [Header("URLs")]
     [SerializeField] private string imageUrl;
@@ -22,7 +22,7 @@ public class RuntimeVuforiaVideoTarget : MonoBehaviour
     [SerializeField] private bool downloadVideoBeforePlay = true;
 
     private ImageTargetBehaviour imageTarget;
-    private VuforiaArtworkVideoSurface videoSurface;
+    private ArtworkVideoSurface videoSurface;
 
     private async void Start()
     {
@@ -67,7 +67,7 @@ public class RuntimeVuforiaVideoTarget : MonoBehaviour
 
         if (imageTarget == null)
         {
-            Debug.LogError("[RuntimeTarget] Vuforia failed to create Image Target.");
+            Debug.LogError("[RuntimeTarget] Failed to create Image Target.");
             return;
         }
 
@@ -77,7 +77,7 @@ public class RuntimeVuforiaVideoTarget : MonoBehaviour
         imageTarget.OnTargetStatusChanged += OnTargetStatusChanged;
 
         GameObject videoRoot = new GameObject("RuntimeVideo");
-        videoSurface = videoRoot.AddComponent<VuforiaArtworkVideoSurface>();
+        videoSurface = videoRoot.AddComponent<ArtworkVideoSurface>();
         
         await videoSurface.SetupAsync(
             imageTarget.transform,

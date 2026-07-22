@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.Video;
 
-public class VuforiaArtworkVideoSurface : MonoBehaviour
+public class ArtworkVideoSurface : MonoBehaviour
 {
     [SerializeField] private Material videoMaterial;
     [SerializeField] private string videoTextureProperty = "_MainTex";
@@ -36,7 +36,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
         if (videoMaterial == null)
         {
-            Debug.LogError("[VuforiaArtworkVideoSurface] Video material is not assigned.");
+            Debug.LogError("[ArtworkVideoSurface] Video material is not assigned.");
             return Task.CompletedTask;
         }
 
@@ -60,7 +60,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
         if (string.IsNullOrEmpty(videoPlayer?.url))
         {
-            Debug.LogWarning("[VuforiaArtworkVideoSurface] Track started but video URL is not set yet.");
+            Debug.LogWarning("[ArtworkVideoSurface] Track started but video URL is not set yet.");
             return;
         }
 
@@ -138,12 +138,12 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
         if (string.IsNullOrWhiteSpace(playUrl))
         {
-            Debug.LogWarning("[VuforiaArtworkVideoSurface] No video URL/path available yet.");
+            Debug.LogWarning("[ArtworkVideoSurface] No video URL/path available yet.");
             return;
         }
 
         videoPlayer.url = playUrl;
-        Debug.Log("[VuforiaArtworkVideoSurface] Video URL set: " + playUrl);
+        Debug.Log("[ArtworkVideoSurface] Video URL set: " + playUrl);
     }
 
     private void BeginPlaybackPrepare()
@@ -182,7 +182,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         }
         catch (Exception ex)
         {
-            Debug.LogError("[VuforiaArtworkVideoSurface] Invalid local video path: " + ex.Message);
+            Debug.LogError("[ArtworkVideoSurface] Invalid local video path: " + ex.Message);
             return pathOrUrl;
         }
     }
@@ -227,7 +227,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
         float halfW = width * 0.5f;
         float halfH = height * 0.5f;
 
-        Mesh mesh = new Mesh { name = "VuforiaArtworkVideoMesh" };
+        Mesh mesh = new Mesh { name = "ArtworkVideoMesh" };
         mesh.vertices = new[]
         {
             new Vector3(-halfW, 0f, -halfH),
@@ -252,7 +252,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
     {
         vp.prepareCompleted -= OnVideoPrepared;
         IsVideoPrepared = true;
-        Debug.Log("[VuforiaArtworkVideoSurface] Video prepared.");
+        Debug.Log("[ArtworkVideoSurface] Video prepared.");
         PreparedForPlayback?.Invoke();
 
         if (IsTracked)
@@ -271,7 +271,7 @@ public class VuforiaArtworkVideoSurface : MonoBehaviour
 
     private void OnVideoError(VideoPlayer vp, string message)
     {
-        Debug.LogError("[VuforiaArtworkVideoSurface] Video error: " + message);
+        Debug.LogError("[ArtworkVideoSurface] Video error: " + message);
         IsVideoPrepared = false;
     }
 
