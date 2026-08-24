@@ -114,6 +114,12 @@ public class ServerManager : MonoBehaviour
             yield break;
         }
 
+        string imageUrl = response.artwork != null ? response.artwork.imageURL : null;
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+            Log($"[ServerManager] Response image URL: {imageUrl}");
+        else
+            Log("[ServerManager] Response image URL: (none)");
+
         onSuccess?.Invoke(response);
     }
 

@@ -28,7 +28,35 @@ public static class ArtworkSessionCache
 
     public static bool HasImage(string artworkId) => File.Exists(GetImagePath(artworkId));
 
-    public static bool HasVideo(string artworkId) => File.Exists(GetVideoPath(artworkId));
+    public static bool HasVideo(string artworkId) => IsValidVideoFile(GetVideoPath(artworkId));
+
+    public static bool IsValidVideoFile(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            return false;
+
+        try
+        {
+            var info = new FileInfo(path);
+            if (info.Length < 64)
+                return false;
+
+            using FileStream stream = File.OpenRead(path);
+            byte[] header = new byte[12];
+            if (stream.Read(header, 0, 12) < 12)
+                return false;
+
+            // ISO BMFF / MP4: bytes 4..7 == 'ftyp'
+            return header[4] == (byte)'f' &&
+                   header[5] == (byte)'t' &&
+                   header[6] == (byte)'y' &&
+                   header[7] == (byte)'p';
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     public static string GetImagePath(string artworkId) =>
         Path.Combine(ImagesDir, SanitizeId(artworkId) + ".jpg");
@@ -73,15 +101,82 @@ public static class ArtworkSessionCache
         if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             Directory.CreateDirectory(directory);
 
+        // Reuse only if the cached file is a real MP4 (not a truncated/error body).
+        if (IsValidVideoFile(localPath))
+            yield break;
+
         if (File.Exists(localPath))
+        {
+            Debug.LogWarning("[ArtworkSessionCache] Removing invalid cached video: " + localPath);
             File.Delete(localPath);
+        }
 
-        using UnityWebRequest request = UnityWebRequest.Get(url);
-        request.downloadHandler = new DownloadHandlerFile(localPath);
-        yield return request.SendWebRequest();
+        string tempPath = localPath + ".tmp";
+        const int maxAttempts = 3;
 
-        if (request.result != UnityWebRequest.Result.Success)
-            Debug.LogError("[ArtworkSessionCache] Video download failed: " + request.error);
+        for (int attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            if (File.Exists(tempPath))
+                File.Delete(tempPath);
+
+            using UnityWebRequest request = UnityWebRequest.Get(url);
+            request.timeout = 180;
+            request.downloadHandler = new DownloadHandlerFile(tempPath);
+            yield return request.SendWebRequest();
+
+            bool ok = request.result == UnityWebRequest.Result.Success &&
+                      IsValidVideoFile(tempPath);
+
+            if (ok)
+            {
+                if (File.Exists(localPath))
+                    File.Delete(localPath);
+
+                File.Move(tempPath, localPath);
+
+                // Give Android a moment to flush before VideoPlayer opens the file.
+                yield return null;
+                yield return null;
+
+                if (IsValidVideoFile(localPath))
+                {
+                    Debug.Log("[ArtworkSessionCache] Video cached (" +
+                              new FileInfo(localPath).Length + " bytes): " + localPath);
+                    yield break;
+                }
+
+                Debug.LogWarning("[ArtworkSessionCache] Cached video failed validation after move.");
+                if (File.Exists(localPath))
+                    File.Delete(localPath);
+            }
+            else
+            {
+                string bodyHint = string.Empty;
+                if (File.Exists(tempPath))
+                {
+                    try
+                    {
+                        long len = new FileInfo(tempPath).Length;
+                        bodyHint = " | bytes=" + len;
+                        // If server returned XML/HTML error page, log a snippet.
+                        if (len > 0 && len < 2048)
+                            bodyHint += " | body=" + File.ReadAllText(tempPath);
+                    }
+                    catch { /* ignore */ }
+
+                    File.Delete(tempPath);
+                }
+
+                Debug.LogWarning(
+                    "[ArtworkSessionCache] Video download attempt " + attempt + "/" + maxAttempts +
+                    " failed: " + (request.error ?? ("HTTP " + request.responseCode)) + bodyHint);
+            }
+
+            if (attempt < maxAttempts)
+                yield return new WaitForSecondsRealtime(0.75f * attempt);
+        }
+
+        Debug.LogError("[ArtworkSessionCache] Video download failed after retries: " + url);
     }
 
     public static void UpsertArtworkRecord(string artworkId, string imageUrl, string videoUrl)

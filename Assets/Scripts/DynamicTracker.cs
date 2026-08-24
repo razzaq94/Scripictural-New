@@ -111,6 +111,13 @@ public class DynamicTracker : MonoBehaviour
         string resolvedImageUrl = ResolveUrl(imageUrl);
         string resolvedVideoUrl = ResolveUrl(videoUrl);
 
+        Debug.Log(LogTag + " Resolved URLs | artworkId=" + artworkId +
+                  "\n  raw image: " + imageUrl +
+                  "\n  resolved image: " + resolvedImageUrl +
+                  "\n  raw video: " + videoUrl +
+                  "\n  resolved video: " + resolvedVideoUrl +
+                  "\n  assetBaseUrl: " + assetBaseUrl);
+
         ArtworkSessionCache.UpsertArtworkRecord(artworkId, resolvedImageUrl, resolvedVideoUrl);
         StartMarkerPreload(artworkId, resolvedImageUrl);
         StartCoroutine(SetupTarget(artworkId, resolvedImageUrl, resolvedVideoUrl));
@@ -181,12 +188,17 @@ public class DynamicTracker : MonoBehaviour
 
         string localVideoPath = ArtworkSessionCache.GetVideoPath(artworkId);
         bool hasLocalVideo = ArtworkSessionCache.HasVideo(artworkId);
+        bool preferLocalPlayback = ArtworkVideoSurface.ShouldPreferLocalPlayback();
 
         GameObject videoRoot = new GameObject("ArtworkVideo_" + artworkId);
         ArtworkVideoSurface videoSurface = videoRoot.AddComponent<ArtworkVideoSurface>();
         System.Action preparedHandler = () => OnVideoSurfacePrepared(artworkId);
         preparedHandlers[artworkId] = preparedHandler;
         videoSurface.PreparedForPlayback += preparedHandler;
+
+        // Low-end devices: avoid VideoPlayer remote streaming (fails on large MP4s).
+        // High-end: allow remote stream for faster start, still cache locally as fallback.
+        string setupRemoteUrl = preferLocalPlayback && !hasLocalVideo ? null : videoUrl;
 
         RuntimeArtworkData data = new RuntimeArtworkData
         {
@@ -198,7 +210,7 @@ public class DynamicTracker : MonoBehaviour
             aspect = (float)texture.width / texture.height,
             imageTarget = imageTarget,
             videoSurface = videoSurface,
-            isVideoReady = hasLocalVideo || !string.IsNullOrWhiteSpace(videoUrl)
+            isVideoReady = hasLocalVideo || (!preferLocalPlayback && !string.IsNullOrWhiteSpace(videoUrl))
         };
 
         runtimeArtworkMap[artworkId] = data;
@@ -209,9 +221,10 @@ public class DynamicTracker : MonoBehaviour
             imageTarget.transform,
             texture,
             physicalWidthMeters,
-            videoUrl,
+            setupRemoteUrl,
             hasLocalVideo ? localVideoPath : null,
-            videoMaterial
+            videoMaterial,
+            preferLocalPlayback
         );
 
         while (!setupVideoTask.IsCompleted)
@@ -228,24 +241,36 @@ public class DynamicTracker : MonoBehaviour
         StartCoroutine(EnsureInitialTrackingState(artworkId));
 
         processingArtworkIds.Remove(artworkId);
-        Debug.Log(LogTag + " Runtime target ready | artworkId=" + artworkId);
+        Debug.Log(LogTag + " Runtime target ready | artworkId=" + artworkId +
+                  " | preferLocal=" + preferLocalPlayback);
     }
 
     private IEnumerator DownloadVideoAndBind(RuntimeArtworkData data)
     {
         yield return ArtworkSessionCache.DownloadAndSave(data.remoteVideoUrl, data.localVideoPath);
 
-        if (!File.Exists(data.localVideoPath))
+        if (!ArtworkSessionCache.IsValidVideoFile(data.localVideoPath))
         {
             Debug.LogWarning(LogTag + " Video cache download failed | artworkId=" + data.artworkId);
             yield break;
         }
 
+        // Brief delay so Android MediaPlayer can open the newly written file.
+        yield return null;
+        yield return new WaitForSecondsRealtime(0.15f);
+
         if (!runtimeArtworkMap.TryGetValue(data.artworkId, out RuntimeArtworkData current))
             yield break;
 
-        // Keep streaming from the remote URL if playback already started.
-        if (current.videoSurface != null && current.videoSurface.IsVideoPrepared)
+        if (current.videoSurface == null)
+            yield break;
+
+        bool keepRemoteStream =
+            current.videoSurface.IsVideoPrepared &&
+            !current.videoSurface.IsPlayingFromLocal &&
+            !current.videoSurface.RemotePlaybackFailed;
+
+        if (keepRemoteStream)
             yield break;
 
         Task bindTask = current.videoSurface.BindLocalVideoAsync(data.localVideoPath);
@@ -457,12 +482,16 @@ public class DynamicTracker : MonoBehaviour
 
     private IEnumerator PreloadMarkerTexture(string artworkId, string resolvedImageUrl)
     {
+        Debug.Log(LogTag + " Marker image request | artworkId=" + artworkId + " | url=" + resolvedImageUrl);
+
         using UnityWebRequest req = UnityWebRequestTexture.GetTexture(resolvedImageUrl, false);
         yield return req.SendWebRequest();
 
         if (req.result != UnityWebRequest.Result.Success)
         {
-            Debug.LogError(LogTag + " Image download failed for " + artworkId + " | " + req.error);
+            Debug.LogError(LogTag + " Image download failed for " + artworkId +
+                           " | url=" + resolvedImageUrl +
+                           " | HTTP " + req.responseCode + " | " + req.error);
             markerPreloadRoutines.Remove(artworkId);
             yield break;
         }

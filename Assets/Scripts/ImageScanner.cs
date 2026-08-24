@@ -368,7 +368,9 @@ public class ImageScanner : MonoBehaviour
                             response.matched &&
                             !string.IsNullOrWhiteSpace(response.artworkId))
                         {
+                            string imageUrl = response.artwork != null ? response.artwork.imageURL : null;
                             Log($"<color=#00ffcc>MATCH: {response.artworkId}</color>");
+                            Log($"<color=#00ffcc>Image URL: {(string.IsNullOrWhiteSpace(imageUrl) ? "(none)" : imageUrl)}</color>");
 
                             if (dynamicTracker != null)
                                 dynamicTracker.OnArtworkDetected(response);
