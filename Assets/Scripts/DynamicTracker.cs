@@ -34,6 +34,10 @@ public class DynamicTracker : MonoBehaviour
     [Header("Loading UI")]
     [SerializeField] private GameObject loadingCanvasPrefab;
 
+    [Header("Scan Prompt UI")]
+    [SerializeField] private GameObject scanPromptPanel;
+    [SerializeField] private float scanPromptShowDelay = 0.4f;
+
     [Header("URLs")]
     [SerializeField] private string assetBaseUrl = "https://api.scripictural.tecshield.net/";
 
@@ -61,6 +65,16 @@ public class DynamicTracker : MonoBehaviour
     private bool isVerifiedArtworkCurrentlyTracking;
     private float lastTrackingSeenTime = -999f;
     private Coroutine unlockRoutine;
+    private Coroutine scanPromptShowRoutine;
+
+    public static DynamicTracker Instance { get; private set; }
+
+    private void Awake()
+    {
+        Instance = this;
+        RefreshScanPromptPanel(useDelayOnShow: false);
+    }
+
     public void OnArtworkDetected(ServerManager.MatchResponse detectData)
     {
         if (detectData == null)
@@ -340,6 +354,7 @@ public class DynamicTracker : MonoBehaviour
             }
 
             OnArtworkTracked(data);
+            RefreshScanPromptPanel(useDelayOnShow: false);
             return;
         }
 
@@ -347,6 +362,66 @@ public class DynamicTracker : MonoBehaviour
             OnArtworkLost(data);
 
         MarkArtworkLost(data.artworkId);
+        RefreshScanPromptPanel(useDelayOnShow: true);
+    }
+
+    public void NotifyOverlayPanelStateChanged()
+    {
+        RefreshScanPromptPanel(useDelayOnShow: false);
+    }
+
+    private static bool IsOverlayPanelOpen()
+    {
+        if (ChatManager.instance != null && ChatManager.instance.IsChatOpen)
+            return true;
+
+        return DescriptionManager.Instance != null && DescriptionManager.Instance.IsDescriptionOpen;
+    }
+
+    // Panel is visible only while nothing is tracked and no full-screen
+    // overlay covers the camera view. The show is delayed so brief tracking
+    // dropouts don't flash the panel on screen.
+    private void RefreshScanPromptPanel(bool useDelayOnShow)
+    {
+        if (scanPromptPanel == null)
+            return;
+
+        if (ShouldBlockScanner() || IsOverlayPanelOpen())
+        {
+            if (scanPromptShowRoutine != null)
+            {
+                StopCoroutine(scanPromptShowRoutine);
+                scanPromptShowRoutine = null;
+            }
+
+            SetScanPromptVisible(false);
+            return;
+        }
+
+        if (!useDelayOnShow || scanPromptShowDelay <= 0f)
+        {
+            SetScanPromptVisible(true);
+            return;
+        }
+
+        if (scanPromptShowRoutine == null)
+            scanPromptShowRoutine = StartCoroutine(ShowScanPromptDelayed());
+    }
+
+    private IEnumerator ShowScanPromptDelayed()
+    {
+        yield return new WaitForSeconds(scanPromptShowDelay);
+
+        scanPromptShowRoutine = null;
+
+        if (!ShouldBlockScanner() && !IsOverlayPanelOpen())
+            SetScanPromptVisible(true);
+    }
+
+    private void SetScanPromptVisible(bool visible)
+    {
+        if (scanPromptPanel != null && scanPromptPanel.activeSelf != visible)
+            scanPromptPanel.SetActive(visible);
     }
 
     private void OnArtworkTracked(RuntimeArtworkData data)
@@ -676,10 +751,15 @@ public class DynamicTracker : MonoBehaviour
     {
         foreach (RuntimeArtworkData data in runtimeArtworkMap.Values)
             OnArtworkLost(data);
+
+        RefreshScanPromptPanel(useDelayOnShow: false);
     }
 
     private void OnDestroy()
     {
+        if (Instance == this)
+            Instance = null;
+
         foreach (RuntimeArtworkData data in runtimeArtworkMap.Values)
         {
             if (data.imageTarget != null)

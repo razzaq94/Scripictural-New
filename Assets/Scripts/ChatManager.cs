@@ -197,6 +197,8 @@ public class ChatManager : MonoBehaviour
         chatParent.SetActive(true);
         closeChatBotButton.gameObject.SetActive(true);
 
+        DynamicTracker.Instance?.NotifyOverlayPanelStateChanged();
+
         ClearMessages();
 
         RefreshArtworkTitleDisplay();
@@ -216,6 +218,8 @@ public class ChatManager : MonoBehaviour
         chatParent.SetActive(false);
         openChatBotButton.gameObject.SetActive(true);
         closeChatBotButton.gameObject.SetActive(false);
+
+        DynamicTracker.Instance?.NotifyOverlayPanelStateChanged();
 
         SetCameraPaused(false);
         ClearFrozenFrame();

@@ -39,6 +39,9 @@ public class DescriptionManager : MonoBehaviour
     private string cachedTitle = string.Empty;
     private Texture2D frozenFrameTexture;
     private bool isOpening;
+
+    public bool IsDescriptionOpen => descriptionPanel != null && descriptionPanel.activeSelf;
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -156,6 +159,8 @@ public class DescriptionManager : MonoBehaviour
         descriptionCloseButton.gameObject.SetActive(true);
         descriptionOpenButton.gameObject.SetActive(false);
 
+        DynamicTracker.Instance?.NotifyOverlayPanelStateChanged();
+
         RefreshDescriptionLayout();
 
         isOpening = false;
@@ -230,6 +235,8 @@ public class DescriptionManager : MonoBehaviour
         descriptionPanel.SetActive(false);
         descriptionCloseButton.gameObject.SetActive(false);
         descriptionOpenButton.gameObject.SetActive(true);
+
+        DynamicTracker.Instance?.NotifyOverlayPanelStateChanged();
 
         chatCloseButton.SetActive(false);
         chatOpenButton.SetActive(true);
