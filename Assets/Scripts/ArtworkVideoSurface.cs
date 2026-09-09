@@ -17,10 +17,19 @@ public class ArtworkVideoSurface : MonoBehaviour
     [SerializeField] private float surfaceYOffset = 0.002f;
     [SerializeField] private bool loop = true;
 
+    [Header("Audio")]
+    [SerializeField] private bool enableAudio = true;
+    [Range(0f, 1f)]
+    [SerializeField] private float audioVolume = 1f;
+    // 3D audio drops in volume as the phone moves away from the marker, so
+    // keep it 2D unless the artwork is meant to sound positional.
+    [SerializeField] private bool spatialAudio = false;
+
     private GameObject surfaceRoot;
     private MeshRenderer videoMeshRenderer;
     private Material videoMaterialInstance;
     private VideoPlayer videoPlayer;
+    private AudioSource videoAudioSource;
     private RenderTexture videoRenderTexture;
     private float markerAspect = 1f;
 
@@ -92,11 +101,9 @@ public class ArtworkVideoSurface : MonoBehaviour
 
         if (!tracked)
         {
-            IsVideoPrepared = false;
-            isPreparing = false;
-            StopPrepareRoutine();
-            HideQuad();
-            PauseVideo();
+            HideQuadVisual();
+            if (videoPlayer != null && videoPlayer.isPlaying)
+                videoPlayer.Pause();
             return;
         }
 
@@ -108,6 +115,12 @@ public class ArtworkVideoSurface : MonoBehaviour
             return;
         }
 
+        if (IsVideoPrepared && videoPlayer != null && videoPlayer.isPrepared)
+        {
+            ShowQuadAndPlay();
+            return;
+        }
+
         HideQuadVisual();
         BeginPlaybackPrepare();
     }
@@ -115,7 +128,16 @@ public class ArtworkVideoSurface : MonoBehaviour
     public void ForceHide()
     {
         IsTracked = false;
-        HideQuad();
+        IsVideoPrepared = false;
+        StopPrepareRoutine();
+        HideQuadVisual();
+
+        if (videoPlayer != null)
+        {
+            if (videoPlayer.isPlaying)
+                videoPlayer.Pause();
+            videoPlayer.Stop();
+        }
     }
 
     private void OnApplicationPause(bool pauseStatus)
@@ -211,6 +233,16 @@ public class ArtworkVideoSurface : MonoBehaviour
     {
         if (videoPlayer == null)
             return;
+
+        if (isPreparing)
+            return;
+
+        if (IsVideoPrepared && videoPlayer.isPrepared)
+        {
+            if (IsTracked)
+                ShowQuadAndPlay();
+            return;
+        }
 
         if (string.IsNullOrEmpty(videoPlayer.url))
             AssignBestAvailableUrl();
@@ -429,6 +461,7 @@ public class ArtworkVideoSurface : MonoBehaviour
         GameObject videoObj = new GameObject("VideoPlayer");
         videoObj.transform.SetParent(transform, false);
         videoPlayer = videoObj.AddComponent<VideoPlayer>();
+        videoAudioSource = null;
     }
 
     private void EnsureVideoPlayerReady()
@@ -449,7 +482,7 @@ public class ArtworkVideoSurface : MonoBehaviour
         videoPlayer.playOnAwake = false;
         videoPlayer.waitForFirstFrame = true;
         videoPlayer.skipOnDrop = true;
-        videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+        ConfigureAudio();
 
         if (preferLocalPlayback)
         {
@@ -488,6 +521,58 @@ public class ArtworkVideoSurface : MonoBehaviour
             videoPlayer.targetMaterialRenderer = videoMeshRenderer;
             videoPlayer.targetMaterialProperty = videoTextureProperty;
         }
+    }
+
+    private void ConfigureAudio()
+    {
+        if (videoPlayer == null)
+            return;
+
+        if (!enableAudio)
+        {
+            videoPlayer.audioOutputMode = VideoAudioOutputMode.None;
+            return;
+        }
+
+        if (videoAudioSource == null)
+        {
+            videoAudioSource = videoPlayer.GetComponent<AudioSource>();
+            if (videoAudioSource == null)
+                videoAudioSource = videoPlayer.gameObject.AddComponent<AudioSource>();
+        }
+
+        videoAudioSource.playOnAwake = false;
+        videoAudioSource.spatialBlend = spatialAudio ? 1f : 0f;
+        videoAudioSource.volume = audioVolume;
+
+        videoPlayer.audioOutputMode = VideoAudioOutputMode.AudioSource;
+        RouteAudioTracks();
+    }
+
+    // EnableAudioTrack only takes effect before Prepare, and the real track
+    // count is only known after it, so this runs on both sides.
+    private void RouteAudioTracks()
+    {
+        if (videoPlayer == null || videoAudioSource == null || !enableAudio)
+            return;
+
+        ushort trackCount = videoPlayer.isPrepared
+            ? videoPlayer.audioTrackCount
+            : (ushort)1;
+
+        for (ushort i = 0; i < trackCount; i++)
+        {
+            videoPlayer.EnableAudioTrack(i, i == 0);
+            videoPlayer.SetTargetAudioSource(i, videoAudioSource);
+        }
+    }
+
+    public void SetAudioVolume(float volume)
+    {
+        audioVolume = Mathf.Clamp01(volume);
+
+        if (videoAudioSource != null)
+            videoAudioSource.volume = audioVolume;
     }
 
     private void RecreateVideoPlayer()
@@ -539,6 +624,7 @@ public class ArtworkVideoSurface : MonoBehaviour
         vp.prepareCompleted -= OnVideoPrepared;
         IsVideoPrepared = true;
         remotePlaybackFailed = false;
+        RouteAudioTracks();
         Debug.Log("[ArtworkVideoSurface] Video prepared (" + (IsPlayingFromLocal ? "local" : "remote") + ").");
         PreparedForPlayback?.Invoke();
 
@@ -548,12 +634,8 @@ public class ArtworkVideoSurface : MonoBehaviour
 
     private void PauseVideo()
     {
-        if (videoPlayer != null)
-        {
-            if (videoPlayer.isPlaying)
-                videoPlayer.Pause();
-            videoPlayer.Stop();
-        }
+        if (videoPlayer != null && videoPlayer.isPlaying)
+            videoPlayer.Pause();
     }
 
     private void OnVideoError(VideoPlayer vp, string message)
