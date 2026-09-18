@@ -41,6 +41,8 @@ public class ImageScanner : MonoBehaviour
 
     [Header("Orientation")]
     [SerializeField] private bool normalizePortraitOrientation = true;
+    [SerializeField] private bool flipUploadVertically = true;
+    [SerializeField] private bool flipUploadHorizontally = true;
 
     [Header("Debug")]
     [SerializeField] private bool verboseLogs = false;
@@ -333,7 +335,7 @@ public class ImageScanner : MonoBehaviour
             yield break;
         }
 
-        Log($"<color=#888888>Captured {frame.width}x{frame.height} via {lastCaptureSource}</color>");
+        Log($"<color=#888888>Captured {frame.width}x{frame.height} via {lastCaptureSource} | flipV={flipUploadVertically} flipH={flipUploadHorizontally}</color>");
 
         float edgeVal = GetEdgeDensity(frame);
         float colorVal = GetColorVariance(frame);
@@ -506,7 +508,36 @@ public class ImageScanner : MonoBehaviour
         if (rotatedTemp != null)
             Destroy(rotatedTemp);
 
+        ApplyUploadFlips(processingTexture);
         return processingTexture;
+    }
+
+    private void ApplyUploadFlips(Texture2D tex)
+    {
+        if (tex == null || (!flipUploadVertically && !flipUploadHorizontally))
+            return;
+
+        int width = tex.width;
+        int height = tex.height;
+        Color32[] src = tex.GetPixels32();
+        Color32[] dst = new Color32[src.Length];
+        bool flipV = flipUploadVertically;
+        bool flipH = flipUploadHorizontally;
+
+        for (int y = 0; y < height; y++)
+        {
+            int srcRow = y * width;
+            int dstY = flipV ? (height - 1 - y) : y;
+            int dstRow = dstY * width;
+            for (int x = 0; x < width; x++)
+            {
+                int dstX = flipH ? (width - 1 - x) : x;
+                dst[dstRow + dstX] = src[srcRow + x];
+            }
+        }
+
+        tex.SetPixels32(dst);
+        tex.Apply(false, false);
     }
 
     private static bool ShouldRotateToPortrait(int width, int height)

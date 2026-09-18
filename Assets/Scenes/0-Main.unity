@@ -788,6 +788,8 @@ MonoBehaviour:
   frameSimilarityThreshold: 0.7
   fingerprintGridSize: 8
   normalizePortraitOrientation: 1
+  flipUploadVertically: 1
+  flipUploadHorizontally: 1
   verboseLogs: 0
   saveDebugFrames: 0
   splashCanvas: {fileID: 106455208}
@@ -2836,6 +2838,8 @@ MonoBehaviour:
   targetUploadSizeKb: 20
   minJpegQuality: 55
   qualityStep: 5
+  saveUploadedFrames: 0
+  maxSavedUploadFrames: 60
   imageScanner: {fileID: 348720560}
 --- !u!4 &1078564964
 Transform:
